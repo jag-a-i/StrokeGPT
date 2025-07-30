@@ -1,3 +1,5 @@
+# app.py (Revised for Multi-Controller Support)
+
 import os
 import sys
 import io
@@ -14,6 +16,8 @@ from handy_controller import HandyController
 from llm_service import LLMService
 from audio_service import AudioService
 from background_modes import AutoModeThread, auto_mode_logic, milking_mode_logic, edging_mode_logic
+# INTEGRATION: Import the new ButtplugController.
+from buttplug_controller import ButtplugController
 
 # ─── INITIALIZATION ───────────────────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -21,8 +25,9 @@ LLM_URL = "http://127.0.0.1:11434/api/chat"
 settings = SettingsManager(settings_file_path="my_settings.json")
 settings.load()
 
-handy = HandyController(settings.handy_key)
-handy.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
+# INTEGRATION: The 'handy' object is replaced by a generic 'device_controller'.
+# It starts as None and will be initialized by the user through the UI.
+device_controller = None
 
 llm = LLMService(url=LLM_URL)
 audio = AudioService()
@@ -37,7 +42,7 @@ messages_for_ui = deque()
 auto_mode_active_task = None
 current_mood = "Curious"
 use_long_term_memory = True
-calibration_pos_mm = 0.0
+calibration_pos_mm = 0.0 # Note: This is Handy-specific
 user_signal_event = threading.Event()
 mode_message_queue = deque(maxlen=5)
 edging_start_time = None
@@ -72,12 +77,21 @@ EDGING_CUES = {"edge me", "start edging", "tease and deny"}
 # ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────────────────────────────
 
 def get_current_context():
-    global edging_start_time, special_persona_mode
+    global edging_start_time, special_persona_mode, device_controller
+    
+    last_speed = 0
+    last_depth = 0
+    # INTEGRATION: Safely get the last position from the active controller.
+    if device_controller and hasattr(device_controller, 'last_relative_speed'):
+        last_speed = device_controller.last_relative_speed
+    if device_controller and hasattr(device_controller, 'last_depth_pos'):
+        last_depth = device_controller.last_depth_pos
+
     context = {
         'persona_desc': settings.persona_desc, 'current_mood': current_mood,
         'user_profile': settings.user_profile, 'patterns': settings.patterns,
-        'rules': settings.rules, 'last_stroke_speed': handy.last_relative_speed,
-        'last_depth_pos': handy.last_depth_pos, 'use_long_term_memory': use_long_term_memory,
+        'rules': settings.rules, 'last_stroke_speed': last_speed,
+        'last_depth_pos': last_depth, 'use_long_term_memory': use_long_term_memory,
         'edging_elapsed_time': None, 'special_persona_mode': special_persona_mode
     }
     if edging_start_time:
@@ -98,7 +112,11 @@ def add_message_to_queue(text, add_to_history=True):
     threading.Thread(target=audio.generate_audio_for_text, args=(text,)).start()
 
 def start_background_mode(mode_logic, initial_message, mode_name):
-    global auto_mode_active_task, edging_start_time
+    global auto_mode_active_task, edging_start_time, device_controller
+    if not device_controller:
+        add_message_to_queue("Please select a device interface in settings first.", add_to_history=False)
+        return
+
     if auto_mode_active_task:
         auto_mode_active_task.stop()
         auto_mode_active_task.join(timeout=5)
@@ -121,7 +139,9 @@ def start_background_mode(mode_logic, initial_message, mode_name):
             'edging': (settings.edging_min_time, settings.edging_max_time)
         }.get(n, (3, 5))
 
-    services = {'llm': llm, 'handy': handy}
+    # INTEGRATION: Pass the generic 'device_controller' to the background thread.
+    # IMPORTANT: This requires a change in background_modes.py to expect 'device' instead of 'handy'.
+    services = {'llm': llm, 'device': device_controller}
     callbacks = {
         'send_message': add_message_to_queue, 'get_context': get_current_context,
         'get_timings': get_timings, 'on_stop': on_stop, 'update_mood': update_mood,
@@ -142,11 +162,44 @@ def home_page():
 def send_static(path):
     return send_from_directory('static', path)
 
+# INTEGRATION: NEW ROUTE to select and initialize the device controller.
+@app.route('/set_interface', methods=['POST'])
+def set_interface():
+    global device_controller
+    data = request.json
+    interface_type = data.get('interface')  # "handy" or "buttplug"
+
+    # Disconnect any existing controller first
+    if device_controller and hasattr(device_controller, 'disconnect'):
+        device_controller.disconnect()
+        device_controller = None
+
+    if interface_type == 'handy':
+        device_controller = HandyController(settings.handy_key)
+        # Apply saved settings
+        device_controller.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
+        settings.device_interface = 'handy'
+        print("✅ Device interface set to: The Handy")
+
+    elif interface_type == 'buttplug':
+        device_controller = ButtplugController()
+        device_controller.connect() # This starts the connection process in a background thread
+        settings.device_interface = 'buttplug'
+        print("✅ Device interface set to: Buttplug.io")
+
+    else:
+        return jsonify({"status": "error", "message": "Invalid interface type"}), 400
+    
+    settings.save()
+    return jsonify({"status": "success", "interface": interface_type})
+
 def _konami_code_action():
     def pattern_thread():
-        handy.move(speed=100, depth=50, stroke_range=100)
-        time.sleep(5)
-        handy.stop()
+        if device_controller:
+            # INTEGRATION: Use the generic controller.
+            device_controller.move(speed=100, depth=50, stroke_range=100)
+            time.sleep(5)
+            device_controller.stop()
     threading.Thread(target=pattern_thread).start()
     message = f"Kept you waiting, huh?<pre>{SNAKE_ASCII}</pre>"
     add_message_to_queue(message)
@@ -154,7 +207,7 @@ def _konami_code_action():
 def _handle_chat_commands(text):
     if any(cmd in text for cmd in STOP_COMMANDS):
         if auto_mode_active_task: auto_mode_active_task.stop()
-        handy.stop()
+        if device_controller: device_controller.stop()
         add_message_to_queue("Stopping.", add_to_history=False)
         return True, jsonify({"status": "stopped"})
     if "up up down down left right left right b a" in text:
@@ -176,15 +229,23 @@ def _handle_chat_commands(text):
 
 @app.route('/send_message', methods=['POST'])
 def handle_user_message():
-    global special_persona_mode, special_persona_interactions_left
+    global special_persona_mode, special_persona_interactions_left, device_controller
     data = request.json
     user_input = data.get('message', '').strip()
 
     if (p := data.get('persona_desc')) and p != settings.persona_desc:
         settings.persona_desc = p; settings.save()
-    if (k := data.get('key')) and k != settings.handy_key:
-        handy.set_api_key(k); settings.handy_key = k; settings.save()
     
+    # INTEGRATION: Handle key setting only if the controller is a HandyController.
+    if (k := data.get('key')) and k != settings.handy_key:
+        settings.handy_key = k
+        if isinstance(device_controller, HandyController):
+            device_controller.set_api_key(k)
+        settings.save()
+    
+    if not device_controller:
+        return jsonify({"status": "no_device_selected", "messages": ["Please select a device interface in the sidebar first."]})
+
     if not handy.handy_key: return jsonify({"status": "no_key_set"})
     if not user_input: return jsonify({"status": "empty_message"})
 
@@ -207,20 +268,40 @@ def handle_user_message():
 
     if chat_text := llm_response.get("chat"): add_message_to_queue(chat_text)
     if new_mood := llm_response.get("new_mood"): global current_mood; current_mood = new_mood
+    
+    # INTEGRATION: Use the generic controller for movement.
     if not auto_mode_active_task and (move := llm_response.get("move")):
-        handy.move(move.get("sp"), move.get("dp"), move.get("rng"))
+        if device_controller:
+            device_controller.move(move.get("sp"), move.get("dp"), move.get("rng"))
+            
     return jsonify({"status": "ok"})
 
 @app.route('/check_settings')
 def check_settings_route():
-    if settings.handy_key and settings.min_depth < settings.max_depth:
-        return jsonify({
-            "configured": True, "persona": settings.persona_desc, "handy_key": settings.handy_key,
-            "ai_name": settings.ai_name, "elevenlabs_key": settings.elevenlabs_api_key,
-            "pfp": settings.profile_picture_b64,
-            "timings": { "auto_min": settings.auto_min_time, "auto_max": settings.auto_max_time, "milking_min": settings.milking_min_time, "milking_max": settings.milking_max_time, "edging_min": settings.edging_min_time, "edging_max": settings.edging_max_time }
-        })
-    return jsonify({"configured": False})
+    # INTEGRATION: Report the configured interface back to the UI.
+    is_configured = (settings.device_interface == 'handy' and settings.handy_key) or \
+                    (settings.device_interface == 'buttplug')
+                    
+    # Re-initialize controller on startup if settings exist
+    global device_controller
+    if not device_controller and is_configured:
+        if settings.device_interface == 'handy':
+            device_controller = HandyController(settings.handy_key)
+            device_controller.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
+        elif settings.device_interface == 'buttplug':
+            device_controller = ButtplugController()
+            device_controller.connect()
+
+    return jsonify({
+        "configured": is_configured,
+        "interface": settings.device_interface, # <-- NEW
+        "persona": settings.persona_desc,
+        "handy_key": settings.handy_key,
+        "ai_name": settings.ai_name,
+        "elevenlabs_key": settings.elevenlabs_api_key,
+        "pfp": settings.profile_picture_b64,
+        "timings": { "auto_min": settings.auto_min_time, "auto_max": settings.auto_max_time, "milking_min": settings.milking_min_time, "milking_max": settings.milking_max_time, "edging_min": settings.edging_min_time, "edging_max": settings.edging_max_time }
+    })
 
 @app.route('/set_ai_name', methods=['POST'])
 def set_ai_name_route():
@@ -256,17 +337,26 @@ def set_pfp_route():
 def set_handy_key_route():
     key = request.json.get('key')
     if not key: return jsonify({"status": "error", "message": "Key is missing"}), 400
-    handy.set_api_key(key); settings.handy_key = key; settings.save()
+    
+    settings.handy_key = key
+    # INTEGRATION: Only set API key if the current controller is the correct type.
+    if isinstance(device_controller, HandyController):
+        device_controller.set_api_key(key)
+    settings.save()
     return jsonify({"status": "success"})
 
 @app.route('/nudge', methods=['POST'])
 def nudge_route():
     global calibration_pos_mm
-    if calibration_pos_mm == 0.0 and (pos := handy.get_position_mm()):
+    # INTEGRATION: Nudging is Handy-specific. Check controller type.
+    if not isinstance(device_controller, HandyController):
+        return jsonify({"status": "error", "message": "Nudge is only available for The Handy"}), 400
+
+    if calibration_pos_mm == 0.0 and (pos := device_controller.get_position_mm()):
         calibration_pos_mm = pos
     direction = request.json.get('direction')
-    calibration_pos_mm = handy.nudge(direction, 0, 100, calibration_pos_mm)
-    return jsonify({"status": "ok", "depth_percent": handy.mm_to_percent(calibration_pos_mm)})
+    calibration_pos_mm = device_controller.nudge(direction, 0, 100, calibration_pos_mm)
+    return jsonify({"status": "ok", "depth_percent": device_controller.mm_to_percent(calibration_pos_mm)})
 
 @app.route('/setup_elevenlabs', methods=['POST'])
 def elevenlabs_setup_route():
@@ -291,26 +381,46 @@ def get_ui_updates_route():
 
 @app.route('/get_status')
 def get_status_route():
-    return jsonify({"mood": current_mood, "speed": handy.last_stroke_speed, "depth": handy.last_depth_pos})
+    last_speed = 0
+    last_depth = 0
+    # INTEGRATION: Safely get status from the active controller.
+    if device_controller and hasattr(device_controller, 'last_relative_speed'):
+        last_speed = device_controller.last_stroke_speed
+    if device_controller and hasattr(device_controller, 'last_depth_pos'):
+        last_depth = device_controller.last_depth_pos
+        
+    return jsonify({"mood": current_mood, "speed": last_speed, "depth": last_depth})
 
 @app.route('/set_depth_limits', methods=['POST'])
 def set_depth_limits_route():
     depth1 = int(request.json.get('min_depth', 5)); depth2 = int(request.json.get('max_depth', 100))
     settings.min_depth = min(depth1, depth2); settings.max_depth = max(depth1, depth2)
-    handy.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
+    
+    # INTEGRATION: Update settings only if the controller is a HandyController.
+    if isinstance(device_controller, HandyController):
+        device_controller.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
     settings.save()
     return jsonify({"status": "success"})
 
 @app.route('/set_speed_limits', methods=['POST'])
 def set_speed_limits_route():
     settings.min_speed = int(request.json.get('min_speed', 10)); settings.max_speed = int(request.json.get('max_speed', 80))
-    handy.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
+
+    # INTEGRATION: Update settings only if the controller is a HandyController.
+    if isinstance(device_controller, HandyController):
+        device_controller.update_settings(settings.min_speed, settings.max_speed, settings.min_depth, settings.max_depth)
     settings.save()
     return jsonify({"status": "success"})
 
 @app.route('/like_last_move', methods=['POST'])
 def like_last_move_route():
-    last_speed = handy.last_relative_speed; last_depth = handy.last_depth_pos
+    if not device_controller:
+        return jsonify({"status": "error", "message": "No active device."}), 400
+
+    # INTEGRATION: Get last move data from the generic controller.
+    last_speed = device_controller.last_relative_speed
+    last_depth = device_controller.last_depth_pos
+    
     pattern_name = llm.name_this_move(last_speed, last_depth, current_mood)
     sp_range = [max(0, last_speed - 5), min(100, last_speed + 5)]; dp_range = [max(0, last_depth - 5), min(100, last_depth + 5)]
     new_pattern = {"name": pattern_name, "sp_range": [int(p) for p in sp_range], "dp_range": [int(p) for p in dp_range], "moods": [current_mood], "score": 1}
@@ -333,13 +443,20 @@ def stop_auto_route():
     if auto_mode_active_task: auto_mode_active_task.stop()
     return jsonify({"status": "auto_mode_stopped"})
 
-# ─── APP STARTUP ───────────────────────────────────────────────────────────────────────────────────
+# ─── APP STARTUP & SHUTDOWN ─────────────────────────────────────────────────────────────────────────────
 def on_exit():
-    print("⏳ Saving settings on exit...")
+    print("⏳ Saving settings and disconnecting device on exit...")
     settings.save(llm, chat_history)
-    print("✅ Settings saved.")
+
+    # INTEGRATION: Gracefully disconnect the device controller if it supports it.
+    if device_controller and hasattr(device_controller, 'disconnect'):
+        device_controller.disconnect()
+
+    print("✅ Settings saved and device disconnected.")
 
 if __name__ == '__main__':
     atexit.register(on_exit)
-    print(f"🚀 Starting Handy AI app at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    # The app now starts without a device selected. The user must choose one from the UI.
+    print(f"🚀 Starting StrokeGPT server at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print("   Please open your browser to http://127.0.0.1:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)
