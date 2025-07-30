@@ -242,11 +242,15 @@ def handle_user_message():
         if isinstance(device_controller, HandyController):
             device_controller.set_api_key(k)
         settings.save()
-    
+ # Check for a device first.
     if not device_controller:
         return jsonify({"status": "no_device_selected", "messages": ["Please select a device interface in the sidebar first."]})
 
-    if not handy.handy_key: return jsonify({"status": "no_key_set"})
+    # Then, ONLY check for a key if the controller is The Handy.
+    if isinstance(device_controller, HandyController) and not settings.handy_key:
+        return jsonify({"status": "no_key_set"})    
+    if not device_controller:
+        return jsonify({"status": "no_device_selected", "messages": ["Please select a device interface in the sidebar first."]})
     if not user_input: return jsonify({"status": "empty_message"})
 
     chat_history.append({"role": "user", "content": user_input})

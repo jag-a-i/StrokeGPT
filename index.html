@@ -1,234 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Handy AI Chat</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-
-        :root {
-            --background-darker: #21222C;
-            --background: #282a36;
-            --background-lighter: #343746;
-            --foreground: #f8f8f2;
-            --comment: #6272a4;
-            --cyan: #8be9fd;
-            --purple: #bd93f9;
-            --pink: #ff79c6;
-            --red: #ff5555;
-            --yellow: #f1fa8c;
-            --shadow: rgba(0, 0, 0, 0.2);
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--background-darker);
-            color: var(--foreground);
-            margin: 0;
-            height: 100vh;
-            overflow: hidden;
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            transition: grid-template-columns 0.35s ease-in-out;
-        }
-        body.sidebar-collapsed { grid-template-columns: 1fr 0px; }
-
-        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; transition: opacity 1s ease-out; opacity: 1; }
-        #splash-screen.hidden { opacity: 0; pointer-events: none; }
-        #splash-screen img { max-width: 90%; max-height: 70%; object-fit: contain; border-radius: 16px; }
-        #splash-screen p { margin-top: 20px; font-size: 2rem; color: #fff; text-shadow: 0 0 10px var(--pink), 0 0 20px var(--pink); animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
-
-        #main-area { flex-grow: 1; display: flex; flex-direction: column; height: 100%; background-color: var(--background); overflow: hidden; }
-        
-        #sidebar { padding: 20px; background-color: var(--background-darker); overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 20px; border-left: 1px solid var(--background-lighter); }
-       
-        #top-bar { padding: 10px 20px; background-color: var(--background); border-bottom: 1px solid var(--background-lighter); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; position: relative; }
-        #toggle-sidebar-btn { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: var(--background-lighter); border: none; color: var(--foreground); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transition: transform 0.3s ease-in-out, background-color 0.2s ease; font-size: 1.2em; display: flex; align-items: center; justify-content: center; }
-        #toggle-sidebar-btn:hover { background-color: var(--comment); }
-        body.sidebar-collapsed #toggle-sidebar-btn { transform: translateY(-50%) rotate(180deg); }
-
-        #top-bar h1 { margin: 0; font-size: 1.5rem; color: var(--cyan); font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 5px rgba(139, 233, 253, 0.4); }
-        #top-bar .top-bar-info { display: flex; align-items: center; gap: 15px; margin-right: 45px; }
-        #mood-display, #edging-timer { background-color: var(--background-lighter); padding: 6px 12px; border-radius: 8px; font-size: 0.9em; }
-        #edging-timer { color: var(--yellow); font-weight: 600; }
-
-        #chat-view { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
-        #bottom-input-area { padding: 20px; border-top: 1px solid var(--background-lighter); background-color: var(--background); flex-shrink: 0; }
-
-        .chat-message-container { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 15px; max-width: 85%; animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .chat-pfp { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-        .message-content { display: flex; flex-direction: column; }
-        .message-bubble { padding: 12px 16px; border-radius: 18px; line-height: 1.5; word-wrap: break-word; }
-        .message-bubble pre { font-family: 'Courier New', Courier, monospace; font-size: 0.9em; text-align: left; white-space: pre; }
-        
-        .bot-bubble { align-self: flex-start; }
-        .bot-bubble .message-bubble { background-color: var(--background-lighter); border-top-left-radius: 4px; }
-        .bot-bubble .speaker-name { align-self: flex-start; }
-
-        .user-bubble { align-self: flex-end; }
-        .user-bubble .message-bubble { background-color: var(--comment); color: var(--foreground); border-top-right-radius: 4px; }
-        
-        .speaker-name { font-size: 0.8em; margin-bottom: 4px; color: var(--purple); font-weight: 600; }
-        .user-bubble .speaker-name { align-self: flex-end; }
-        
-        #visualizer-box { height: 40px; background-color: var(--background-darker); border-radius: 8px; margin-bottom: 15px; padding: 5px; }
-        .setting-section { border-radius: 12px; padding: 15px; background-color: var(--background); box-shadow: 0 4px 12px var(--shadow); }
-        .setting-section h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; font-weight: 600; color: var(--cyan); border-bottom: 1px solid var(--background-lighter); padding-bottom: 10px; }
-        
-        .my-button { padding: 10px 16px; border: none; background-color: var(--comment); color: var(--foreground); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; font-size: 1em; font-weight: 600; width: 100%; box-shadow: 0 2px 4px var(--shadow); }
-        .my-button:hover { background-color: #798dcc; transform: translateY(-2px); box-shadow: 0 4px 8px var(--shadow); }
-        .my-button:active { transform: translateY(0); box-shadow: 0 2px 4px var(--shadow); }
-        .sidebar-button.edging { background-color: var(--yellow); color: var(--background); }
-        .sidebar-button.edging:hover { background-color: #f7ffae; }
-        .sidebar-button.milking { background-color: var(--pink); }
-        .sidebar-button.milking:hover { background-color: #ff92d0; }
-        .sidebar-button.stop { background-color: var(--red); }
-        .sidebar-button.stop:hover { background-color: #ff6e6e; }
-
-        .input-text, .select-box, input[type="number"] { padding: 10px; border: 1px solid var(--background-lighter); background-color: var(--background-lighter); color: var(--foreground); border-radius: 8px; font-size: 1em; width: 100%; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-        .input-text:focus, .select-box:focus, input[type="number"]:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.3); }
-
-        #message-input-line { display: flex; gap: 10px; align-items: center; }
-        #message-input-line .my-button { width: auto; flex-shrink: 0; }
-        #message-input-line .input-text { flex-grow: 1; }
-
-        .audio-toggle-line { display: flex; align-items: center; gap: 8px; padding-top: 10px; }
-
-        #status-text { margin-top: 15px; font-size: 0.9em; text-align: center; color: var(--purple); }
-        #setup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 9999; color: var(--foreground); }
-        #setup-box { text-align: center; background-color: var(--background); padding: 30px; border-radius: 12px; border: 1px solid var(--background-lighter); box-shadow: 0 8px 32px var(--shadow); }
-        #setup-box h2 { color: var(--cyan); margin-top: 0; }
-        #setup-box button { margin-top: 15px; }
-        .slider-container { margin: 15px 0; }
-        
-        .timing-row { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
-        .timing-row label { flex-basis: 50px; font-size: 0.9em; }
-        .timing-row input { flex-grow: 1; width: 40px; }
-        .timing-row span { padding: 0 5px; }
-
-        .typing-dots span { display: inline-block; animation: blink 1.4s infinite both; font-size: 1.5em; line-height: 0; }
-        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes blink { 0% { opacity: 0.2; } 20% { opacity: 1; } 100% { opacity: 0.2; } }
-
-        #easter-egg-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; font-family: 'Courier New', monospace; font-size: 1.5em; display: none; align-items: center; justify-content: center; z-index: 10001; opacity: 0; transition: opacity 1s ease-in-out; text-align: center; }
-
-    </style>
-</head>
-<body>
-    <div id="splash-screen">
-        <img src="/static/splash.jpg" alt="StrokeGPT">
-        <p>Press Enter to Begin</p>
-    </div>
-    <div id="main-area">
-        <div id="top-bar">
-            <h1>StrokeGPT</h1>
-            <div class="top-bar-info">
-                <div id="edging-timer" style="display: none;">00:00</div>
-                <div id="mood-display">Mood: ...</div>
-            </div>
-            <button id="toggle-sidebar-btn">&laquo;</button>
-        </div>
-        <div id="chat-view">
-            <div id="chat-messages-container">
-                <div id="typing-indicator" class="chat-message-container bot-bubble" style="display: none;">
-                    <img class="chat-pfp" id="typing-indicator-pfp" src="/static/default-pfp.png" alt="pfp">
-                    <div class="message-content">
-                        <p class="speaker-name">BOT</p>
-                        <p class="message-bubble typing-dots"><span>.</span><span>.</span><span>.</span></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="bottom-input-area">
-            <div id="visualizer-box"><canvas id="rhythm-canvas"></canvas></div>
-            <div id="message-input-line">
-                <input type="text" id="user-chat-input" class="input-text" placeholder="Type a message or command...">
-                <button id="send-chat-btn" class="my-button">Send</button>
-            </div>
-             <div id="status-text">Status: Checking for saved settings...</div>
-        </div>
-    </div>
-    <div id="sidebar">
-        <div class="setting-section">
-            <h3>Persona</h3>
-            <label for="pfp-upload" style="cursor: pointer; display: block; margin-bottom: 15px;">
-                <img id="ai-pfp-preview" src="/static/default-pfp.png" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 10px auto; display: block; border: 2px solid var(--comment);">
-            </label>
-            <input type="file" id="pfp-upload" accept="image/*" style="display: none;">
-            <input type="text" id="ai-name-input" class="input-text" placeholder="AI's Name..." style="margin-bottom: 10px;">
-            <button id="set-ai-name-btn" class="my-button" style="margin-bottom: 15px;">Set Name</button>
-            <input type="text" id="persona-input" class="input-text" placeholder="Describe the AI's persona...">
-            <button id="set-persona-btn" class="my-button" style="margin-top: 10px;">Set Persona</button>
-        </div>
-        <div class="setting-section">
-            <h3>Mode Timings (Seconds)</h3>
-            <div class="timing-row"><label for="auto-min-time">Auto:</label><input type="number" id="auto-min-time" min="1" max="60" step="1" value="4"><span>-</span><input type="number" id="auto-max-time" min="1" max="60" step="1" value="7"></div>
-            <div class="timing-row"><label for="edging-min-time">Edging:</label><input type="number" id="edging-min-time" min="1" max="60" step="1" value="5"><span>-</span><input type="number" id="edging-max-time" min="1" max="60" step="1" value="8"></div>
-            <div class="timing-row"><label for="milking-min-time">Milking:</label><input type="number" id="milking-min-time" min="1" max="60" step="1" value="2"><span>-</span><input type="number" id="milking-max-time" min="1" max="60" step="1" value="5"></div>
-            <button id="save-timings-btn" class="my-button">Save Timings</button>
-        </div>
-        <div class="setting-section">
-            <h3>Voice Output (ElevenLabs)</h3>
-            <input type="password" id="elevenlabs-key-input" class="input-text" placeholder="ElevenLabs API Key">
-            <button id="set-elevenlabs-key-button" class="my-button">Set Key</button>
-            <select id="elevenlabs-voice-select-box" class="select-box" disabled><option>Set API Key to load voices...</option></select>
-            <div class="audio-toggle-line"><input type="checkbox" id="enable-audio-checkbox"><label for="enable-audio-checkbox">Enable Audio</label></div>
-        </div>
-        <div class="setting-section">
-            <h3>Control Actions</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;"><button id="start-auto-btn" class="my-button" style="flex: 1;">Start Auto</button><button id="stop-auto-btn" class="my-button" style="flex: 1;">Stop Auto</button></div>
-            <div style="display: flex; gap: 10px;"><button id="like-this-move-btn" class="my-button" style="flex: 1;">👍 Like</button><button id="toggle-memory-btn" class="my-button" style="flex: 1;">Memories: ON</button></div>
-            <button id="im-close-btn" class="my-button sidebar-button milking" style="display: none; margin-top: 10px;">I'm Close!</button>
-        </div>
-        <div class="setting-section" style="margin-top: auto;">
-            <h3>DANGER ZONE</h3>
-            <button id="edging-mode-btn" class="my-button sidebar-button edging" style="margin-bottom: 10px;">Edge Me</button>
-            <button id="milking-mode-btn" class="my-button sidebar-button milking" style="margin-bottom: 10px;">Milk Me</button>
-            <button id="emergency-stop-all-btn" class="my-button sidebar-button stop">STOP EVERYTHING</button>
-        </div>
-    </div>
+    <!-- ... (rest of the HTML body) ... -->
     <div id="setup-overlay"><div id="setup-box"></div></div>
     <div id="easter-egg-overlay"></div>
     <script>
         const D = document;
         const userChatInput = D.getElementById('user-chat-input');
         const personaInput = D.getElementById('persona-input');
-        const setPersonaBtn = D.getElementById('set-persona-btn');
-        const aiNameInput = D.getElementById('ai-name-input');
-        const setAiNameBtn = D.getElementById('set-ai-name-btn');
-        const elevenLabsKeyInput = D.getElementById('elevenlabs-key-input');
-        const setElevenLabsKeyButton = D.getElementById('set-elevenlabs-key-button');
         const setupOverlay = D.getElementById('setup-overlay');
         const setupBox = D.getElementById('setup-box');
         const statusText = D.getElementById('status-text');
-        const moodDisplay = D.getElementById('mood-display');
-        const rhythmCanvas = D.getElementById('rhythm-canvas');
-        const typingIndicator = D.getElementById('typing-indicator');
-        const chatView = D.getElementById('chat-view');
-        const chatMessagesContainer = D.getElementById('chat-messages-container');
+        
+        // INTEGRATION: Get all new and relevant DOM elements
+        const handyKeySection = D.getElementById('handy-key-section');
+        const handyKeyInput = D.getElementById('handy-key-input');
+        const setHandyKeyBtn = D.getElementById('set-handy-key-btn');
+        const handyRadio = D.getElementById('if-handy');
+        const buttplugRadio = D.getElementById('if-buttplug');
+
+        // Other relevant elements
+        const aiNameInput = D.getElementById('ai-name-input');
+        const setAiNameBtn = D.getElementById('set-ai-name-btn');
         const pfpUploadInput = D.getElementById('pfp-upload');
         const pfpPreview = D.getElementById('ai-pfp-preview');
         const typingIndicatorPfp = D.getElementById('typing-indicator-pfp');
-        const toggleSidebarBtn = D.getElementById('toggle-sidebar-btn');
+        const elevenLabsKeyInput = D.getElementById('elevenlabs-key-input');
+        const setElevenLabsKeyButton = D.getElementById('set-elevenlabs-key-button');
+        const chatView = D.getElementById('chat-view');
+        const chatMessagesContainer = D.getElementById('chat-messages-container');
+        const typingIndicator = D.getElementById('typing-indicator');
+        const moodDisplay = D.getElementById('mood-display');
+        const rhythmCanvas = D.getElementById('rhythm-canvas');
+        const ctx = rhythmCanvas.getContext('2d');
         const imCloseBtn = D.getElementById('im-close-btn');
         const edgingModeBtn = D.getElementById('edging-mode-btn');
         const edgingTimer = D.getElementById('edging-timer');
         const easterEggOverlay = D.getElementById('easter-egg-overlay');
-        const ctx = rhythmCanvas.getContext('2d');
+        const toggleSidebarBtn = D.getElementById('toggle-sidebar-btn');
+
+        // INTEGRATION: Global variable to hold the currently selected interface
+        let currentInterface = null;
         let myHandyKey = '', myPersonaDescription = '', aiName = 'BOT', edgingTimerInterval = null;
         
         async function apiCall(endpoint, options = {}) {
             try {
                 const response = await fetch(endpoint, options);
-                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
                 const contentType = response.headers.get("content-type");
+                if (!response.ok) { 
+                    const errData = await (contentType.includes("json") ? response.json() : response.text());
+                    console.error(`HTTP error! status: ${response.status}`, errData);
+                    if (errData.messages) errData.messages.forEach(msg => addChatMessage('BOT', `SERVER ERROR: ${msg}`));
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 if (contentType && contentType.includes("audio/mpeg")) { return response.blob(); }
                 return response.json();
             } catch (error) {
@@ -236,21 +57,14 @@
                 statusText.textContent = `Error: Cannot connect to server.`;
             }
         }
-        
-        function addChatMessage(sender, text) {
-            const pfpSrc = sender === 'BOT' ? pfpPreview.src : '';
-            const pfpHtml = sender === 'BOT' ? `<img class="chat-pfp" src="${pfpSrc}" alt="pfp">` : '';
-            const speaker = sender === 'BOT' ? aiName : 'YOU';
-            const el = document.createElement('div');
-            el.className = `chat-message-container ${sender === 'BOT' ? 'bot-bubble' : 'user-bubble'}`;
-            el.innerHTML = `
-                ${pfpHtml}
-                <div class="message-content">
-                    <p class="speaker-name">${speaker}</p>
-                    <p class="message-bubble">${text}</p>
-                </div>`;
-            chatMessagesContainer.insertBefore(el, typingIndicator);
-            chatView.scrollTop = chatView.scrollHeight;
+
+        // INTEGRATION: Function to show/hide UI elements based on selected interface
+        function updateUIVisibility() {
+            if (currentInterface === 'handy') {
+                handyKeySection.style.display = 'block';
+            } else {
+                handyKeySection.style.display = 'none';
+            }
         }
 
         async function sendUserMessage(message) {
@@ -266,6 +80,261 @@
             }
         }
 
+        // INTEGRATION: Overhauled Setup Wizard
+        function renderSetup(isReturningUser = false, data = {}) {
+            setupOverlay.style.display = 'flex';
+            let step = 1;
+
+            async function handleInterfaceSelection(selectedInterface) {
+                currentInterface = selectedInterface;
+                statusText.textContent = `Connecting to ${selectedInterface}...`;
+                await apiCall('/set_interface', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({interface: currentInterface})});
+                (currentInterface === 'handy' ? handyRadio : buttplugRadio).checked = true;
+                updateUIVisibility();
+            }
+            
+            function displayStep() {
+                if (step === 1) { // Choose Interface
+                    setupBox.innerHTML = `<h2>Step 1: Choose Your Device</h2>
+                    <div class="radio-group">
+                        <div><input type="radio" id="setup-if-handy" name="setup-interface" value="handy"><label for="setup-if-handy">The Handy</label></div>
+                        <div><input type="radio" id="setup-if-buttplug" name="setup-interface" value="buttplug"><label for="setup-if-buttplug">Buttplug.io / Intiface Central</label></div>
+                    </div>
+                    <button id="setup-next" class="my-button">Next</button>`;
+                    D.getElementById('setup-next').onclick = async () => {
+                        const selected = D.querySelector('input[name="setup-interface"]:checked');
+                        if (!selected) return;
+                        await handleInterfaceSelection(selected.value);
+                        step = currentInterface === 'handy' ? 2 : 3; // Skip key step for buttplug
+                        displayStep();
+                    };
+                } else if (step === 2) { // Handy Key (Handy Only)
+                    setupBox.innerHTML = `<h2>Step 2: Handy Key</h2><p>Please enter your connection key from handyfeeling.com</p><input type="password" id="setup-key" class="input-text" placeholder="Handy Key"><br><button id="setup-next" class="my-button">Next</button>`;
+                    D.getElementById('setup-next').onclick = async () => {
+                        const key = D.getElementById('setup-key').value.trim();
+                        if (!key) return;
+                        myHandyKey = key;
+                        handyKeyInput.value = key;
+                        await apiCall('/set_handy_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: myHandyKey }) });
+                        step = 3; displayStep();
+                    };
+                } else if (step === 3) { // Persona
+                    const stepNum = currentInterface === 'handy' ? 3 : 2;
+                    setupBox.innerHTML = `<h2>Step ${stepNum}: Persona</h2><p>Describe your AI partner for this session.</p><input type="text" id="setup-persona" class="input-text" value="${data.persona || 'An energetic and passionate girlfriend'}" placeholder="Describe persona"><br><button id="setup-next" class="my-button">Next</button>`;
+                    D.getElementById('setup-next').onclick = () => {
+                        personaInput.value = D.getElementById('setup-persona').value.trim();
+                        if (isReturningUser || currentInterface === 'buttplug') { // Buttplug setup ends here
+                            setupOverlay.style.display = 'none'; 
+                            sendUserMessage(''); 
+                        } else { // Continue to Handy calibration
+                            step = 4; displayStep();
+                        }
+                    };
+                } else if (step === 4 || step === 5) { // Handy Depth Calibration
+                    const title = step === 4 ? "Set the Tip" : "Set the Base";
+                    const btnText = step === 4 ? "Set Tip" : "Next";
+                    const stepNum = step + (currentInterface === 'handy' ? 0 : -1);
+                    setupBox.innerHTML = `<h2>Step ${stepNum}: ${title}</h2><p>Move the Handy to the desired position and click '${btnText}'.</p><div><button id="d-down" class="my-button" style="width:auto;"><< Out</button><span id="d-val" style="padding:0 15px;">?</span>%<button id="d-up" class="my-button" style="width:auto;">In >></button></div><button id="set-pos" class="my-button">${btnText}</button>`;
+                    let currentDepth = 50;
+                    const updateDepthDisplay = (val) => D.getElementById('d-val').textContent = val;
+                    const nudge = async (dir) => { const res = await apiCall('/nudge', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({direction:dir})}); if (res) { currentDepth = res.depth_percent; updateDepthDisplay(currentDepth); } };
+                    D.getElementById('d-up').onclick = () => nudge('up');
+                    D.getElementById('d-down').onclick = () => nudge('down');
+                    D.getElementById('set-pos').onclick = async () => {
+                        if (step === 4) { D.minDepth = currentDepth; step = 5; displayStep(); }
+                        else { D.maxDepth = currentDepth; await apiCall('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({min_depth:D.minDepth, max_depth:D.maxDepth})}); step = 6; displayStep(); }
+                    };
+                } else if (step === 6 || step === 7) { // Handy Speed Limits
+                    const title = step === 6 ? "Minimum Speed" : "Maximum Speed";
+                    const defaultVal = step === 6 ? 10 : 80;
+                    const stepNum = step + (currentInterface === 'handy' ? 0 : -1);
+                    setupBox.innerHTML = `<h2>Step ${stepNum}: Set ${title}</h2><p>Choose your preferred ${title.toLowerCase()}.</p><div class="slider-container"><input type="range" min="0" max="100" value="${defaultVal}" id="speed-slider"><span id="speed-val">${defaultVal}%</span></div><button id="set-speed" class="my-button">Next</button>`;
+                    const slider = D.getElementById('speed-slider');
+                    slider.oninput = () => D.getElementById('speed-val').textContent = `${slider.value}%`;
+                    D.getElementById('set-speed').onclick = async () => {
+                        if (step === 6) { D.minSpeed = slider.value; step = 7; displayStep(); }
+                        else { D.maxSpeed = slider.value; await apiCall('/set_speed_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({min_speed:D.minSpeed, max_speed:D.maxSpeed})}); setupOverlay.style.display = 'none'; statusText.textContent = `Setup complete. Ready to chat.`; }
+                    };
+                }
+            }
+            displayStep();
+        }
+
+        async function startupCheck() {
+            const data = await apiCall('/check_settings');
+            if (data && data.configured) {
+                statusText.textContent = 'Welcome back! Settings loaded.';
+                // INTEGRATION: Load saved interface and update UI accordingly
+                currentInterface = data.interface;
+                if (currentInterface) {
+                    (currentInterface === 'handy' ? handyRadio : buttplugRadio).checked = true;
+                    updateUIVisibility();
+                }
+
+                myHandyKey = data.handy_key;
+                handyKeyInput.value = myHandyKey;
+                personaInput.value = data.persona;
+                if(data.ai_name) { aiName = data.ai_name; aiNameInput.value = aiName; D.querySelector('#typing-indicator .speaker-name').textContent = aiName; }
+                if (data.pfp) { pfpPreview.src = data.pfp; typingIndicatorPfp.src = data.pfp; }
+                if(data.elevenlabs_key) { elevenLabsKeyInput.value = data.elevenlabs_key; setElevenLabsKeyButton.click(); }
+                if (localStorage.getItem('sidebar_collapsed') === 'true') { D.body.classList.add('sidebar-collapsed'); }
+                
+                D.getElementById('splash-screen').style.display = 'none';
+                setupOverlay.style.display = 'none'; // Don't show setup if already configured
+            } else {
+                const startHandler = (e) => { if(e.key === 'Enter'){ D.removeEventListener('keydown', startHandler); D.getElementById('splash-screen').classList.add('hidden'); setTimeout(() => renderSetup(false), 1000); }};
+                D.addEventListener('keydown', startHandler);
+            }
+        }
+        
+        // --- START OF MISSING CODE ---
+        // --- Event Listeners ---
+        D.getElementById('send-chat-btn').addEventListener('click', () => sendUserMessage(userChatInput.value));
+        userChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendUserMessage(userChatInput.value); });
+        
+        // INTEGRATION: Listen for changes on the interface radio buttons
+        async function handleInterfaceChange(event) {
+            const selectedInterface = event.target.value;
+            if (selectedInterface !== currentInterface) {
+                statusText.textContent = `Switching to ${selectedInterface}...`;
+                const result = await apiCall('/set_interface', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({interface: selectedInterface}) });
+                if (result && result.status === 'success') {
+                    currentInterface = selectedInterface;
+                    updateUIVisibility();
+                    statusText.textContent = `Device interface set to ${selectedInterface}.`;
+                } else {
+                    statusText.textContent = `Failed to switch to ${selectedInterface}.`;
+                    // Revert radio button if failed
+                    if(currentInterface) (currentInterface === 'handy' ? handyRadio : buttplugRadio).checked = true;
+                }
+            }
+        }
+        handyRadio.addEventListener('change', handleInterfaceChange);
+        buttplugRadio.addEventListener('change', handleInterfaceChange);
+
+        setHandyKeyBtn.addEventListener('click', () => {
+            const key = handyKeyInput.value.trim();
+            if (!key) return;
+            myHandyKey = key;
+            apiCall('/set_handy_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: myHandyKey }) });
+            statusText.textContent = 'Handy Key updated!';
+        });
+
+        D.getElementById('set-persona-btn').addEventListener('click', () => { sendUserMessage(''); statusText.textContent = 'Persona updated!'; });
+        
+        setAiNameBtn.addEventListener('click', async () => {
+            const newName = aiNameInput.value.trim();
+            if (!newName) return;
+            const data = await apiCall('/set_ai_name', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: newName}) });
+            if (data && data.status === 'special_persona_activated') {
+                easterEggOverlay.innerHTML = `// WARNING: Personality Core Override Detected...<br>// Subject: ${data.persona}<br><br>Good luck.`;
+                easterEggOverlay.style.display = 'flex';
+                setTimeout(() => { easterEggOverlay.style.opacity = '1'; }, 10);
+                setTimeout(() => {
+                    easterEggOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        easterEggOverlay.style.display = 'none';
+                        aiName = data.persona;
+                        aiNameInput.value = aiName;
+                        D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
+                        addChatMessage('BOT', data.message);
+                    }, 1000);
+                }, 3000);
+            } else if (data && data.status === 'success') {
+                aiName = data.name;
+                statusText.textContent = `AI name updated to ${aiName}!`;
+                D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
+            }
+        });
+
+        toggleSidebarBtn.addEventListener('click', () => {
+            const isCollapsed = D.body.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('sidebar_collapsed', isCollapsed);
+            setTimeout(resizeCanvas, 350);
+        });
+
+        pfpUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result;
+                pfpPreview.src = base64String;
+                typingIndicatorPfp.src = base64String;
+                apiCall('/set_profile_picture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pfp_b64: base64String }) });
+            };
+            reader.readAsDataURL(file);
+        });
+
+        setElevenLabsKeyButton.addEventListener('click', async () => {
+            const apiKey = elevenLabsKeyInput.value.trim();
+            if(!apiKey) return;
+            const data = await apiCall('/setup_elevenlabs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({api_key:apiKey})});
+            if (data && data.status === 'success') {
+                const selectBox = D.getElementById('elevenlabs-voice-select-box');
+                selectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
+                for (const [name, id] of Object.entries(data.voices)) { selectBox.innerHTML += `<option value="${id}">${name}</option>`; }
+                selectBox.disabled = false;
+            }
+        });
+
+        D.getElementById('like-this-move-btn').addEventListener('click', async () => {
+            const data = await apiCall('/like_last_move', { method: 'POST' });
+            if (data && data.status === 'boosted') {
+                statusText.textContent = `Saved '${data.name}' to my memory!`;
+            } else { statusText.textContent = "Status: No active move to like."; }
+        });
+
+        const stopButtons = [D.getElementById('stop-auto-btn'), D.getElementById('emergency-stop-all-btn')];
+        stopButtons.forEach(btn => btn.addEventListener('click', () => {
+            imCloseBtn.style.display = 'none';
+            stopEdgingTimer();
+            if(btn.id === 'emergency-stop-all-btn') sendUserMessage('stop');
+            else apiCall('/stop_auto_mode', {method:'POST'});
+        }));
+
+        edgingModeBtn.addEventListener('click', () => {
+            apiCall('/start_edging_mode', {method:'POST'});
+            imCloseBtn.style.display = 'block';
+            startEdgingTimer();
+        });
+
+        imCloseBtn.addEventListener('click', () => {
+            apiCall('/signal_edge', { method: 'POST' });
+            imCloseBtn.style.transform = 'scale(0.95)';
+            setTimeout(() => { imCloseBtn.style.transform = ''; }, 100);
+        });
+
+        D.getElementById('elevenlabs-voice-select-box').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: e.target.value, enabled:D.getElementById('enable-audio-checkbox').checked})}));
+        D.getElementById('enable-audio-checkbox').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: D.getElementById('elevenlabs-voice-select-box').value, enabled: e.target.checked})}));
+        D.getElementById('start-auto-btn').addEventListener('click', () => sendUserMessage('take over'));
+        D.getElementById('milking-mode-btn').addEventListener('click', () => apiCall('/start_milking_mode', {method:'POST'}));
+
+        // --- Polling Loops ---
+        setInterval(async () => {
+            const data = await apiCall('/get_updates');
+            if (!data) return;
+            if (data instanceof Blob || (data.messages && data.messages.length > 0)) {
+                typingIndicator.style.display = 'none';
+            }
+            if (data instanceof Blob) {
+                const audio = new Audio(URL.createObjectURL(data));
+                audio.play();
+            } else if (data.messages) {
+                data.messages.forEach(msg => addChatMessage('BOT', msg));
+            }
+        }, 1500);
+
+        setInterval(async () => {
+            const data = await apiCall('/get_status');
+            if (data) {
+                const emoji = {'Curious':'🤔','Teasing':'😉','Playful':'😜','Loving':'❤️','Excited':'✨','Passionate':'🔥','Seductive':'😈','Anticipatory':'👀','Breathless':'🥵','Dominant':'👑','Submissive':'🙇‍♀️','Vulnerable':'😳','Confident':'😏','Intimate':'🥰','Needy':'🥺','Overwhelmed':'🤯','Afterglow':'😌'}[data.mood] || '';
+                moodDisplay.textContent = `Mood: ${data.mood} ${emoji}`;
+                drawHandyVisualizer(data.speed || 0, data.depth || 0);
+            }
+        }, 500);
+        
+        // --- Canvas and Timer Functions ---
         function resizeCanvas() {
             if (!rhythmCanvas.parentElement) return;
             rhythmCanvas.width = rhythmCanvas.parentElement.clientWidth;
@@ -310,193 +379,24 @@
             edgingTimer.style.display = 'none';
         }
 
-        function renderSetup(isReturningUser = false, data = {}) {
-            setupOverlay.style.display = 'flex';
-            let step = isReturningUser ? 2 : 1;
-            
-            function displayStep() {
-                if (step === 1) {
-                    setupBox.innerHTML = `<h2>Step 1: Handy Key</h2><p>Please enter your connection key from handyfeeling.com</p><input type="password" id="setup-key" class="input-text" placeholder="Handy Key"><br><button id="setup-next" class="my-button">Next</button>`;
-                    D.getElementById('setup-next').onclick = async () => {
-                        const key = D.getElementById('setup-key').value.trim();
-                        if (!key) return;
-                        myHandyKey = key;
-                        await apiCall('/set_handy_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: myHandyKey }) });
-                        step = 2; displayStep();
-                    };
-                } else if (step === 2) {
-                    setupBox.innerHTML = `<h2>Step 2: Persona</h2><p>Describe your AI partner for this session.</p><input type="text" id="setup-persona" class="input-text" value="${data.persona || 'An energetic and passionate girlfriend'}" placeholder="Describe persona"><br><button id="setup-next" class="my-button">Next</button>`;
-                    D.getElementById('setup-next').onclick = () => {
-                        personaInput.value = D.getElementById('setup-persona').value.trim();
-                        if (isReturningUser) { setupOverlay.style.display = 'none'; sendUserMessage(''); }
-                        else { step = 3; displayStep(); }
-                    };
-                } else if (step === 3 || step === 4) {
-                    const title = step === 3 ? "Set the Tip" : "Set the Base";
-                    const btnText = step === 3 ? "Set Tip" : "Next";
-                    setupBox.innerHTML = `<h2>Step ${step}: ${title}</h2><p>Move the Handy to the desired position and click '${btnText}'.</p><div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button><span id="d-val" style="padding:0 15px;">?</span>%<button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div><button id="set-pos" class="my-button">${btnText}</button>`;
-                    let currentDepth = 50;
-                    const updateDepthDisplay = (val) => D.getElementById('d-val').textContent = val;
-                    const nudge = async (dir) => { const res = await apiCall('/nudge', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({direction:dir, key:myHandyKey})}); if (res) { currentDepth = res.depth_percent; updateDepthDisplay(currentDepth); } };
-                    D.getElementById('d-up').onclick = () => nudge('up');
-                    D.getElementById('d-down').onclick = () => nudge('down');
-                    D.getElementById('set-pos').onclick = async () => {
-                        if (step === 3) { D.minDepth = currentDepth; step = 4; displayStep(); }
-                        else { D.maxDepth = currentDepth; await apiCall('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({min_depth:D.minDepth, max_depth:D.maxDepth})}); step = 5; displayStep(); }
-                    };
-                } else if (step === 5 || step === 6) {
-                    const title = step === 5 ? "Minimum Speed" : "Maximum Speed";
-                    const defaultVal = step === 5 ? 10 : 80;
-                    setupBox.innerHTML = `<h2>Step ${step}: Set ${title}</h2><p>Choose your preferred ${title.toLowerCase()}.</p><div class="slider-container"><input type="range" min="0" max="100" value="${defaultVal}" id="speed-slider"><span id="speed-val">${defaultVal}%</span></div><button id="set-speed" class="my-button">Next</button>`;
-                    const slider = D.getElementById('speed-slider');
-                    slider.oninput = () => D.getElementById('speed-val').textContent = `${slider.value}%`;
-                    D.getElementById('set-speed').onclick = async () => {
-                        if (step === 5) { D.minSpeed = slider.value; step = 6; displayStep(); }
-                        else { D.maxSpeed = slider.value; await apiCall('/set_speed_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({min_speed:D.minSpeed, max_speed:D.maxSpeed})}); setupOverlay.style.display = 'none'; statusText.textContent = `Setup complete. Ready to chat.`; }
-                    };
-                }
-            }
-            displayStep();
+        // Helper function to add chat messages (for reference, unchanged)
+        function addChatMessage(sender, text) {
+            const pfpSrc = sender === 'BOT' ? pfpPreview.src : '';
+            const pfpHtml = sender === 'BOT' ? `<img class="chat-pfp" src="${pfpSrc}" alt="pfp">` : '';
+            const speaker = sender === 'BOT' ? aiName : 'YOU';
+            const el = document.createElement('div');
+            el.className = `chat-message-container ${sender === 'BOT' ? 'bot-bubble' : 'user-bubble'}`;
+            el.innerHTML = `
+                ${pfpHtml}
+                <div class="message-content">
+                    <p class="speaker-name">${speaker}</p>
+                    <p class="message-bubble">${text}</p>
+                </div>`;
+            chatMessagesContainer.insertBefore(el, typingIndicator);
+            chatView.scrollTop = chatView.scrollHeight;
         }
 
-        async function startupCheck() {
-            const data = await apiCall('/check_settings');
-            if (data && data.configured) {
-                statusText.textContent = 'Welcome back! Settings loaded.';
-                myHandyKey = data.handy_key;
-                personaInput.value = data.persona;
-                if(data.ai_name) {
-                    aiName = data.ai_name;
-                    aiNameInput.value = aiName;
-                    D.querySelector('#typing-indicator .speaker-name').textContent = aiName;
-                }
-                if (data.pfp) {
-                    pfpPreview.src = data.pfp;
-                    typingIndicatorPfp.src = data.pfp;
-                }
-                if(data.elevenlabs_key) {
-                    elevenLabsKeyInput.value = data.elevenlabs_key;
-                    setElevenLabsKeyButton.click();
-                }
-                if (localStorage.getItem('sidebar_collapsed') === 'true') {
-                    D.body.classList.add('sidebar-collapsed');
-                }
-                D.getElementById('splash-screen').style.display = 'none';
-                renderSetup(true, data);
-            } else {
-                const startHandler = (e) => { if(e.key === 'Enter'){ D.removeEventListener('keydown', startHandler); D.getElementById('splash-screen').classList.add('hidden'); setTimeout(() => renderSetup(false), 1000); }};
-                D.addEventListener('keydown', startHandler);
-            }
-        }
-        
-        // Event Listeners
-        D.getElementById('send-chat-btn').addEventListener('click', () => sendUserMessage(userChatInput.value));
-        userChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendUserMessage(userChatInput.value); });
-        setPersonaBtn.addEventListener('click', () => { sendUserMessage(''); statusText.textContent = 'Persona updated!'; });
-        setAiNameBtn.addEventListener('click', async () => {
-            const newName = aiNameInput.value.trim();
-            if (!newName) return;
-            const data = await apiCall('/set_ai_name', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: newName}) });
-            if (data && data.status === 'special_persona_activated') {
-                easterEggOverlay.innerHTML = `// WARNING: Personality Core Override Detected...<br>// Subject: ${data.persona}<br><br>Good luck.`;
-                easterEggOverlay.style.display = 'flex';
-                setTimeout(() => { easterEggOverlay.style.opacity = '1'; }, 10);
-                setTimeout(() => {
-                    easterEggOverlay.style.opacity = '0';
-                    setTimeout(() => {
-                        easterEggOverlay.style.display = 'none';
-                        aiName = data.persona;
-                        aiNameInput.value = aiName;
-                        D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
-                        addChatMessage('BOT', data.message);
-                    }, 1000);
-                }, 3000);
-            } else if (data && data.status === 'success') {
-                aiName = data.name;
-                statusText.textContent = `AI name updated to ${aiName}!`;
-                D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
-            }
-        });
-        toggleSidebarBtn.addEventListener('click', () => {
-            const isCollapsed = D.body.classList.toggle('sidebar-collapsed');
-            localStorage.setItem('sidebar_collapsed', isCollapsed);
-            setTimeout(resizeCanvas, 350);
-        });
-        pfpUploadInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result;
-                pfpPreview.src = base64String;
-                typingIndicatorPfp.src = base64String;
-                apiCall('/set_profile_picture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pfp_b64: base64String }) });
-            };
-            reader.readAsDataURL(file);
-        });
-        setElevenLabsKeyButton.addEventListener('click', async () => {
-            const apiKey = elevenLabsKeyInput.value.trim();
-            if(!apiKey) return;
-            const data = await apiCall('/setup_elevenlabs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({api_key:apiKey})});
-            if (data && data.status === 'success') {
-                const selectBox = D.getElementById('elevenlabs-voice-select-box');
-                selectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
-                for (const [name, id] of Object.entries(data.voices)) { selectBox.innerHTML += `<option value="${id}">${name}</option>`; }
-                selectBox.disabled = false;
-            }
-        });
-        D.getElementById('like-this-move-btn').addEventListener('click', async () => {
-            const data = await apiCall('/like_last_move', { method: 'POST' });
-            if (data && data.status === 'boosted') {
-                statusText.textContent = `Saved '${data.name}' to my memory!`;
-            } else { statusText.textContent = "Status: No active move to like."; }
-        });
-        const stopButtons = [D.getElementById('stop-auto-btn'), D.getElementById('emergency-stop-all-btn')];
-        stopButtons.forEach(btn => btn.addEventListener('click', () => {
-            imCloseBtn.style.display = 'none';
-            stopEdgingTimer();
-            if(btn.id === 'emergency-stop-all-btn') sendUserMessage('stop');
-            else apiCall('/stop_auto_mode', {method:'POST'});
-        }));
-        edgingModeBtn.addEventListener('click', () => {
-            apiCall('/start_edging_mode', {method:'POST'});
-            imCloseBtn.style.display = 'block';
-            startEdgingTimer();
-        });
-        imCloseBtn.addEventListener('click', () => {
-            apiCall('/signal_edge', { method: 'POST' });
-            imCloseBtn.style.transform = 'scale(0.95)';
-            setTimeout(() => { imCloseBtn.style.transform = ''; }, 100);
-        });
-        D.getElementById('elevenlabs-voice-select-box').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: e.target.value, enabled:D.getElementById('enable-audio-checkbox').checked})}));
-        D.getElementById('enable-audio-checkbox').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: D.getElementById('elevenlabs-voice-select-box').value, enabled: e.target.checked})}));
-        D.getElementById('start-auto-btn').addEventListener('click', () => sendUserMessage('take over'));
-        D.getElementById('milking-mode-btn').addEventListener('click', () => apiCall('/start_milking_mode', {method:'POST'}));
-
-        // Polling Loops
-        setInterval(async () => {
-            const data = await apiCall('/get_updates');
-            if (!data) return;
-            if (data instanceof Blob || (data.messages && data.messages.length > 0)) {
-                typingIndicator.style.display = 'none';
-            }
-            if (data instanceof Blob) {
-                const audio = new Audio(URL.createObjectURL(data));
-                audio.play();
-            } else if (data.messages) {
-                data.messages.forEach(msg => addChatMessage('BOT', msg));
-            }
-        }, 1500);
-        setInterval(async () => {
-            const data = await apiCall('/get_status');
-            if (data) {
-                const emoji = {'Curious':'🤔','Teasing':'😉','Playful':'😜','Loving':'❤️','Excited':'✨','Passionate':'🔥','Seductive':'😈','Anticipatory':'👀','Breathless':'🥵','Dominant':'👑','Submissive':'🙇‍♀️','Vulnerable':'😳','Confident':'😏','Intimate':'🥰','Needy':'🥺','Overwhelmed':'🤯','Afterglow':'😌'}[data.mood] || '';
-                moodDisplay.textContent = `Mood: ${data.mood} ${emoji}`;
-                drawHandyVisualizer(data.speed || 0, data.depth || 0);
-            }
-        }, 500);
-
-        // Startup
+        // --- Startup ---
         window.addEventListener('resize', resizeCanvas);
         D.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
