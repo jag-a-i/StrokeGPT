@@ -1,0 +1,27 @@
+{
+  "handy_key": "",
+  "ai_name": "BOT",
+  "persona_desc": "An energetic and passionate girlfriend",
+  "profile_picture_b64": "",
+  "elevenlabs_api_key": "",
+  "elevenlabs_voice_id": "",
+  "patterns": [],
+  "milking_patterns": [],
+  "rules": [],
+  "user_profile": {
+    "name": "Unknown",
+    "likes": [],
+    "dislikes": [],
+    "key_memories": []
+  },
+  "min_depth": 5,
+  "max_depth": 100,
+  "min_speed": 10,
+  "max_speed": 80,
+  "auto_min_time": 4.0,
+  "auto_max_time": 7.0,
+  "milking_min_time": 2.5,
+  "milking_max_time": 4.5,
+  "edging_min_time": 5.0,
+  "edging_max_time": 8.0
+}
