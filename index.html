@@ -187,128 +187,232 @@
             }
         }
         
-        // --- START OF MISSING CODE ---
         // --- Event Listeners ---
-        D.getElementById('send-chat-btn').addEventListener('click', () => sendUserMessage(userChatInput.value));
-        userChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendUserMessage(userChatInput.value); });
-        
-        // INTEGRATION: Listen for changes on the interface radio buttons
-        async function handleInterfaceChange(event) {
-            const selectedInterface = event.target.value;
-            if (selectedInterface !== currentInterface) {
-                statusText.textContent = `Switching to ${selectedInterface}...`;
-                const result = await apiCall('/set_interface', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({interface: selectedInterface}) });
-                if (result && result.status === 'success') {
-                    currentInterface = selectedInterface;
-                    updateUIVisibility();
-                    statusText.textContent = `Device interface set to ${selectedInterface}.`;
-                } else {
-                    statusText.textContent = `Failed to switch to ${selectedInterface}.`;
-                    // Revert radio button if failed
-                    if(currentInterface) (currentInterface === 'handy' ? handyRadio : buttplugRadio).checked = true;
+        function setupEventListeners() {
+            // Helper function to safely add event listeners
+            function safeAddListener(selector, event, handler) {
+                const element = typeof selector === 'string' ? D.getElementById(selector) : selector;
+                if (element) {
+                    element.addEventListener(event, handler);
                 }
             }
-        }
-        handyRadio.addEventListener('change', handleInterfaceChange);
-        buttplugRadio.addEventListener('change', handleInterfaceChange);
 
-        setHandyKeyBtn.addEventListener('click', () => {
-            const key = handyKeyInput.value.trim();
-            if (!key) return;
-            myHandyKey = key;
-            apiCall('/set_handy_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: myHandyKey }) });
-            statusText.textContent = 'Handy Key updated!';
-        });
+            // Chat input
+            if (userChatInput) {
+                safeAddListener('send-chat-btn', 'click', () => sendUserMessage(userChatInput.value));
+                userChatInput.addEventListener('keypress', (e) => { 
+                    if (e.key === 'Enter') sendUserMessage(userChatInput.value); 
+                });
+            }
 
-        D.getElementById('set-persona-btn').addEventListener('click', () => { sendUserMessage(''); statusText.textContent = 'Persona updated!'; });
-        
-        setAiNameBtn.addEventListener('click', async () => {
-            const newName = aiNameInput.value.trim();
-            if (!newName) return;
-            const data = await apiCall('/set_ai_name', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: newName}) });
-            if (data && data.status === 'special_persona_activated') {
-                easterEggOverlay.innerHTML = `// WARNING: Personality Core Override Detected...<br>// Subject: ${data.persona}<br><br>Good luck.`;
-                easterEggOverlay.style.display = 'flex';
-                setTimeout(() => { easterEggOverlay.style.opacity = '1'; }, 10);
-                setTimeout(() => {
-                    easterEggOverlay.style.opacity = '0';
-                    setTimeout(() => {
-                        easterEggOverlay.style.display = 'none';
-                        aiName = data.persona;
-                        aiNameInput.value = aiName;
+            // Interface radio buttons
+            if (handyRadio) handyRadio.addEventListener('change', handleInterfaceChange);
+            if (buttplugRadio) buttplugRadio.addEventListener('change', handleInterfaceChange);
+
+            // Handy key setup
+            if (setHandyKeyBtn) {
+                setHandyKeyBtn.addEventListener('click', () => {
+                    const key = handyKeyInput?.value.trim();
+                    if (!key) return;
+                    myHandyKey = key;
+                    apiCall('/set_handy_key', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ key: myHandyKey }) 
+                    });
+                    if (statusText) statusText.textContent = 'Handy Key updated!';
+                });
+            }
+
+            // Persona button
+            const setPersonaBtn = D.getElementById('set-persona-btn');
+            if (setPersonaBtn) {
+                setPersonaBtn.addEventListener('click', () => { 
+                    sendUserMessage(''); 
+                    if (statusText) statusText.textContent = 'Persona updated!'; 
+                });
+            }
+
+            // AI Name
+            if (setAiNameBtn) {
+                setAiNameBtn.addEventListener('click', async () => {
+                    const newName = aiNameInput?.value.trim();
+                    if (!newName) return;
+                    const data = await apiCall('/set_ai_name', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({name: newName}) 
+                    });
+                    if (!data) return;
+
+                    if (data.status === 'special_persona_activated') {
+                        if (easterEggOverlay) {
+                            easterEggOverlay.innerHTML = `// WARNING: Personality Core Override Detected...<br>// Subject: ${data.persona}<br><br>Good luck.`;
+                            easterEggOverlay.style.display = 'flex';
+                            setTimeout(() => { easterEggOverlay.style.opacity = '1'; }, 10);
+                            setTimeout(() => {
+                                easterEggOverlay.style.opacity = '0';
+                                setTimeout(() => {
+                                    easterEggOverlay.style.display = 'none';
+                                    aiName = data.persona;
+                                    if (aiNameInput) aiNameInput.value = aiName;
+                                    D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
+                                    addChatMessage('BOT', data.message);
+                                }, 1000);
+                            }, 3000);
+                        }
+                    } else if (data.status === 'success') {
+                        aiName = data.name;
+                        if (statusText) statusText.textContent = `AI name updated to ${aiName}!`;
                         D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
-                        addChatMessage('BOT', data.message);
-                    }, 1000);
-                }, 3000);
-            } else if (data && data.status === 'success') {
-                aiName = data.name;
-                statusText.textContent = `AI name updated to ${aiName}!`;
-                D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
+                    }
+                });
             }
-        });
 
-        toggleSidebarBtn.addEventListener('click', () => {
-            const isCollapsed = D.body.classList.toggle('sidebar-collapsed');
-            localStorage.setItem('sidebar_collapsed', isCollapsed);
-            setTimeout(resizeCanvas, 350);
-        });
- 
-        pfpUploadInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result;
-                pfpPreview.src = base64String;
-                typingIndicatorPfp.src = base64String;
-                apiCall('/set_profile_picture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pfp_b64: base64String }) });
-            };
-            reader.readAsDataURL(file);
-        });
-
-        setElevenLabsKeyButton.addEventListener('click', async () => {
-            const apiKey = elevenLabsKeyInput.value.trim();
-            if(!apiKey) return;
-            const data = await apiCall('/setup_elevenlabs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({api_key:apiKey})});
-            if (data && data.status === 'success') {
-                const selectBox = D.getElementById('elevenlabs-voice-select-box');
-                selectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
-                for (const [name, id] of Object.entries(data.voices)) { selectBox.innerHTML += `<option value="${id}">${name}</option>`; }
-                selectBox.disabled = false;
+            // Sidebar toggle
+            if (toggleSidebarBtn) {
+                toggleSidebarBtn.addEventListener('click', () => {
+                    const isCollapsed = D.body.classList.toggle('sidebar-collapsed');
+                    localStorage.setItem('sidebar_collapsed', isCollapsed);
+                    setTimeout(resizeCanvas, 350);
+                });
             }
-        });
 
-        D.getElementById('like-this-move-btn').addEventListener('click', async () => {
-            const data = await apiCall('/like_last_move', { method: 'POST' });
-            if (data && data.status === 'boosted') {
-                statusText.textContent = `Saved '${data.name}' to my memory!`;
-            } else { statusText.textContent = "Status: No active move to like."; }
-        });
+            // Profile picture upload
+            if (pfpUploadInput) {
+                pfpUploadInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64String = reader.result;
+                        if (pfpPreview) pfpPreview.src = base64String;
+                        if (typingIndicatorPfp) typingIndicatorPfp.src = base64String;
+                        apiCall('/set_profile_picture', { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ pfp_b64: base64String }) 
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
 
-        const stopButtons = [D.getElementById('stop-auto-btn'), D.getElementById('emergency-stop-all-btn')];
-        stopButtons.forEach(btn => btn.addEventListener('click', () => {
-            imCloseBtn.style.display = 'none';
-            stopEdgingTimer();
-            if(btn.id === 'emergency-stop-all-btn') sendUserMessage('stop');
-            else apiCall('/stop_auto_mode', {method:'POST'});
-        }));
+            // ElevenLabs setup
+            if (setElevenLabsKeyButton) {
+                setElevenLabsKeyButton.addEventListener('click', async () => {
+                    const apiKey = elevenLabsKeyInput?.value.trim();
+                    if(!apiKey) return;
+                    const data = await apiCall('/setup_elevenlabs', {
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({api_key: apiKey})
+                    });
+                    if (data?.status === 'success') {
+                        const selectBox = D.getElementById('elevenlabs-voice-select-box');
+                        if (selectBox) {
+                            selectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
+                            for (const [name, id] of Object.entries(data.voices)) { 
+                                selectBox.innerHTML += `<option value="${id}">${name}</option>`; 
+                            }
+                            selectBox.disabled = false;
+                        }
+                    }
+                });
+            }
 
-        edgingModeBtn.addEventListener('click', () => {
-            apiCall('/start_edging_mode', {method:'POST'});
-            imCloseBtn.style.display = 'block';
-            startEdgingTimer();
-        });
+            // Other controls with null checks
+            const likeMoveBtn = D.getElementById('like-this-move-btn');
+            if (likeMoveBtn) {
+                likeMoveBtn.addEventListener('click', async () => {
+                    const data = await apiCall('/like_last_move', { method: 'POST' });
+                    if (data?.status === 'boosted' && statusText) {
+                        statusText.textContent = `Saved '${data.name}' to my memory!`;
+                    } else if (statusText) { 
+                        statusText.textContent = "Status: No active move to like."; 
+                    }
+                });
+            }
 
-        imCloseBtn.addEventListener('click', () => {
-            apiCall('/signal_edge', { method: 'POST' });
-            imCloseBtn.style.transform = 'scale(0.95)';
-            setTimeout(() => { imCloseBtn.style.transform = ''; }, 100);
-        });
+            // Stop buttons
+            const stopAutoBtn = D.getElementById('stop-auto-btn');
+            const emergencyStopBtn = D.getElementById('emergency-stop-all-btn');
+            
+            [stopAutoBtn, emergencyStopBtn].filter(Boolean).forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (imCloseBtn) imCloseBtn.style.display = 'none';
+                    stopEdgingTimer();
+                    if(btn.id === 'emergency-stop-all-btn') {
+                        sendUserMessage('stop');
+                    } else {
+                        apiCall('/stop_auto_mode', {method:'POST'});
+                    }
+                });
+            });
 
-        D.getElementById('elevenlabs-voice-select-box').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: e.target.value, enabled:D.getElementById('enable-audio-checkbox').checked})}));
-        D.getElementById('enable-audio-checkbox').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: D.getElementById('elevenlabs-voice-select-box').value, enabled: e.target.checked})}));
-        D.getElementById('start-auto-btn').addEventListener('click', () => sendUserMessage('take over'));
-        D.getElementById('milking-mode-btn').addEventListener('click', () => apiCall('/start_milking_mode', {method:'POST'}));
+            // Edging mode
+            if (edgingModeBtn) {
+                edgingModeBtn.addEventListener('click', () => {
+                    apiCall('/start_edging_mode', {method:'POST'});
+                    if (imCloseBtn) imCloseBtn.style.display = 'block';
+                    startEdgingTimer();
+                });
+            }
+
+            if (imCloseBtn) {
+                imCloseBtn.addEventListener('click', () => {
+                    apiCall('/signal_edge', { method: 'POST' });
+                    imCloseBtn.style.transform = 'scale(0.95)';
+                    setTimeout(() => { imCloseBtn.style.transform = ''; }, 100);
+                });
+            }
+
+            // Voice selection
+            const voiceSelect = D.getElementById('elevenlabs-voice-select-box');
+            const audioCheckbox = D.getElementById('enable-audio-checkbox');
+            
+            if (voiceSelect) {
+                voiceSelect.addEventListener('change', (e) => {
+                    apiCall('/set_elevenlabs_voice', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({
+                            voice_id: e.target.value, 
+                            enabled: audioCheckbox?.checked || false
+                        })
+                    });
+                });
+            }
+
+            if (audioCheckbox) {
+                audioCheckbox.addEventListener('change', (e) => {
+                    if (voiceSelect) {
+                        apiCall('/set_elevenlabs_voice', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'}, 
+                            body: JSON.stringify({
+                                voice_id: voiceSelect.value,
+                                enabled: e.target.checked
+                            })
+                        });
+                    }
+                });
+            }
+
+            // Other buttons
+            const startAutoBtn = D.getElementById('start-auto-btn');
+            const milkingModeBtn = D.getElementById('milking-mode-btn');
+            
+            if (startAutoBtn) {
+                startAutoBtn.addEventListener('click', () => sendUserMessage('take over'));
+            }
+            
+            if (milkingModeBtn) {
+                milkingModeBtn.addEventListener('click', () => {
+                    apiCall('/start_milking_mode', {method:'POST'});
+                });
+            }
+        }
 
         // --- Polling Loops ---
         setInterval(async () => {
@@ -400,6 +504,8 @@
         D.addEventListener('DOMContentLoaded', () => {
             // Initialize canvas context now that the DOM is loaded
             if (rhythmCanvas) {
+                // Setup all event listeners after DOM is fully loaded
+                setupEventListeners();
                 ctx = rhythmCanvas.getContext('2d');
                 window.addEventListener('resize', resizeCanvas);
                 resizeCanvas();
