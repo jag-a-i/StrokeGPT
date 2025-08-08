@@ -9,7 +9,7 @@ import threading
 import time
 from collections import deque
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template_string, send_file, send_from_directory
+from flask import Flask, request, jsonify, render_template_string, send_file, send_from_directory, send_file
 
 from settings_manager import SettingsManager
 from handy_controller import HandyController
@@ -154,13 +154,22 @@ def start_background_mode(mode_logic, initial_message, mode_name):
 # ─── FLASK ROUTES ──────────────────────────────────────────────────────────────────────────────────────
 @app.route('/')
 def home_page():
-    base_path = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(base_path, 'index.html'), 'r', encoding='utf-8') as f:
-        return render_template_string(f.read())
+    return send_from_directory('.', 'index.html')
 
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory('static', path)
+# Serve static files from the 'static' directory
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+# Serve the main JavaScript file
+@app.route('/app.js')
+def serve_js():
+    return send_from_directory('.', 'app.js')
+
+# Serve the main CSS file
+@app.route('/styles.css')
+def serve_css():
+    return send_from_directory('.', 'styles.css')
 
 # INTEGRATION: NEW ROUTE to select and initialize the device controller.
 @app.route('/set_interface', methods=['POST'])
