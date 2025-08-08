@@ -29,7 +29,7 @@
         const typingIndicator = D.getElementById('typing-indicator');
         const moodDisplay = D.getElementById('mood-display');
         const rhythmCanvas = D.getElementById('rhythm-canvas');
-        const ctx = rhythmCanvas.getContext('2d');
+        let ctx = null; // Will be initialized after DOM is loaded
         const imCloseBtn = D.getElementById('im-close-btn');
         const edgingModeBtn = D.getElementById('edging-mode-btn');
         const edgingTimer = D.getElementById('edging-timer');
@@ -397,9 +397,13 @@
         }
 
         // --- Startup ---
-        window.addEventListener('resize', resizeCanvas);
         D.addEventListener('DOMContentLoaded', () => {
-            resizeCanvas();
+            // Initialize canvas context now that the DOM is loaded
+            if (rhythmCanvas) {
+                ctx = rhythmCanvas.getContext('2d');
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+            }
             startupCheck();
         });
     </script>
