@@ -510,7 +510,9 @@
                 window.addEventListener('resize', resizeCanvas);
                 resizeCanvas();
             }
-            startupCheck();
+            
+            // Start polling for updates and initialize the app
+            startupCheck().catch(console.error);
         });
     </script>
 </body>
