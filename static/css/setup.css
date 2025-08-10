@@ -1,0 +1,325 @@
+/* setup.css - Styles for the StrokeGPT setup flow */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Base Styles */
+:root {
+    --background-darker: #1a1b26;
+    --background: #24283b;
+    --background-lighter: #2f3549;
+    --foreground: #c0caf5;
+    --comment: #565f89;
+    --cyan: #7dcfff;
+    --purple: #bb9af7;
+    --pink: #f7768e;
+    --red: #ff5f5f;
+    --yellow: #e0af68;
+    --green: #9ece6a;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --border-radius: 12px;
+    --transition: all 0.2s ease;
+}
+
+* { 
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--background-darker);
+    color: var(--foreground);
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1.6;
+    padding: 20px;
+}
+
+/* Setup Container */
+#setup-container {
+    width: 100%;
+    max-width: 800px;
+    background: var(--background);
+    border-radius: var(--border-radius);
+    box-shadow: 0 10px 30px var(--shadow);
+    overflow: hidden;
+}
+
+/* Header */
+.setup-header {
+    background: var(--background-lighter);
+    padding: 2rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setup-header h1 {
+    color: var(--cyan);
+    margin-bottom: 0.5rem;
+    font-size: 2.2rem;
+}
+
+.setup-header p {
+    color: var(--comment);
+    margin-bottom: 0;
+}
+
+/* Progress Steps */
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    padding: 2rem 3rem 1rem;
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+.progress-steps::before {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 10%;
+    right: 10%;
+    height: 3px;
+    background: var(--background-lighter);
+    z-index: 1;
+    transition: var(--transition);
+}
+
+.progress-bar {
+    position: absolute;
+    top: 30px;
+    left: 10%;
+    height: 3px;
+    background: var(--cyan);
+    z-index: 2;
+    transition: width 0.4s ease;
+}
+
+.step-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 3;
+    position: relative;
+    width: 100px;
+}
+
+.step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--background-lighter);
+    color: var(--comment);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    border: 2px solid transparent;
+    transition: var(--transition);
+}
+
+.step-indicator.active .step-number {
+    background: var(--cyan);
+    color: var(--background-darker);
+    border-color: var(--cyan);
+}
+
+.step-indicator.completed .step-number {
+    background: var(--green);
+    color: var(--background-darker);
+    border-color: var(--green);
+}
+
+.step-label {
+    font-size: 0.9rem;
+    color: var(--comment);
+    text-align: center;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.step-indicator.active .step-label,
+.step-indicator.completed .step-label {
+    color: var(--foreground);
+    font-weight: 500;
+}
+
+/* Setup Content */
+.setup-content {
+    padding: 0 3rem 3rem;
+}
+
+.setup-step {
+    display: none;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.setup-step.active {
+    display: block;
+}
+
+.step-title {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--foreground);
+    text-align: center;
+}
+
+.step-description {
+    color: var(--comment);
+    margin-bottom: 2rem;
+    text-align: center;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 1.5rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--foreground);
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    background: var(--background-lighter);
+    border: 1px solid var(--comment);
+    border-radius: var(--border-radius);
+    color: var(--foreground);
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px rgba(125, 207, 255, 0.2);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.8rem 1.5rem;
+    background: var(--cyan);
+    color: var(--background-darker);
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--comment);
+}
+
+.btn-primary {
+    background: var(--cyan);
+    color: var(--background-darker);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #6ac5e8;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-block {
+    display: block;
+    width: 100%;
+    margin-top: 1.5rem;
+}
+
+/* Button Container */
+.button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.button-container .btn {
+    min-width: 200px;
+    padding: 0.8rem 2rem;
+}
+
+/* Success Step */
+.success-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    display: block;
+}
+
+.success-message {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.hint {
+    color: var(--comment);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* Link Styles */
+.setup-link {
+    color: var(--cyan);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.setup-link:hover {
+    text-decoration: underline;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .progress-steps {
+        padding: 2rem 1rem 1rem;
+    }
+    
+    .setup-content {
+        padding: 0 1.5rem 2rem;
+    }
+    
+    .step-indicator {
+        width: auto;
+        padding: 0 0.5rem;
+    }
+    
+    .step-label {
+        font-size: 0.8rem;
+    }
+}

@@ -1,25 +1,53 @@
-# buttplug_controller.py (Corrected "Execute-and-Wait" Implementation)
+# buttplug_controller.py (Updated for buttplug-py v3)
 import asyncio
 import threading
 import time
-from buttplug import Client, WebsocketConnector
+from typing import Optional, Dict, Any
+
+try:
+    # Import from the installed buttplug-py package
+    from buttplug import (
+        Client,
+        WebsocketConnector,
+        ProtocolSpec,
+        ButtplugError,
+        ClientError,
+        ConnectorError,
+        ServerError
+    )
+
+except ImportError as e:
+    raise ImportError(
+        "Could not import from 'buttplug'. Please ensure you have the correct version installed.\n"
+        "Try: pip install buttplug-py"
+    ) from e
 
 class ButtplugController:
-    def __init__(self, server_uri="ws://127.0.0.1:12345"):
+    def __init__(self, server_uri: str = "ws://127.0.0.1:12345"):
+        """Initialize the Buttplug controller.
+        
+        Args:
+            server_uri: WebSocket URI of the Intiface/Buttplug server
+        """
         self.server_uri = server_uri
         self.client = Client("StrokeGPT Client")
         self.device = None
-        self._lock = threading.Lock()  # Lock for accessing shared resources like the device
+        self._lock = threading.Lock()  # Thread safety for device access
+        self._connected = False  # Track connection state
+        self._shutting_down = False  # Flag for graceful shutdown
 
-        # State variables for the UI. These are updated after each move.
-        self.last_relative_speed = 0
-        self.last_depth_pos = 50
+        # State variables for the UI
+        self.last_relative_speed = 0  # 0-100 scale for UI
+        self.last_depth_pos = 50      # 0-100 scale for UI
+        self.last_stroke_speed = 0    # Alias for last_relative_speed for compatibility
         
-        # --- Threading & AsyncIO Setup ---
-        # The Buttplug library requires its own asyncio event loop to run persistently.
-        # We run this loop in a dedicated background thread.
+        # Setup async event loop in a background thread
         self.loop = asyncio.new_event_loop()
-        self.thread = threading.Thread(target=self._run_event_loop, daemon=True)
+        self.thread = threading.Thread(
+            target=self._run_event_loop, 
+            daemon=True,
+            name="ButtplugControllerThread"
+        )
         self.thread.start()
         print("🤖 Buttplug Controller initialized. Waiting for connection...")
 
@@ -31,132 +59,287 @@ class ButtplugController:
     async def _connect_and_scan(self):
         """The core async connection and scanning logic."""
         try:
-            connector = WebsocketConnector(self.server_uri, loop=self.loop)
+            # Connect to the server
+            connector = ButtplugClientWebsocketConnector(self.server_uri)
             await self.client.connect(connector)
+            self._connected = True
             print("✅ Successfully connected to Buttplug server.")
-            print("...Scanning for devices for 5 seconds...")
-            await self.client.start_scanning()
-            await asyncio.sleep(5)
-            await self.client.stop_scanning()
-
-            if not self.client.devices:
-                print("⚠️ No devices found connected to Intiface/Buttplug server.")
-                return
-
-            # Find the first available compatible device
-            found_device = next((dev for dev in self.client.devices.values() if "Linear" in dev.allowed_messages or "Vibrate" in dev.allowed_messages), None)
             
-            if found_device:
+            # Set up device added/removed handlers
+            @self.client.device_added
+            async def on_device_added(device):
+                print(f"🔌 Device connected: {device.name}")
+                if not self.device:  # Use the first compatible device
+                    await self._try_use_device(device)
+            
+            @self.client.device_removed
+            async def on_device_removed(device):
+                print(f"🔌 Device disconnected: {device.name}")
                 with self._lock:
-                    self.device = found_device
-                print(f"✅ Device Locked: {self.device.name}")
-            else:
-                print("⚠️ No compatible (Linear or Vibrate) devices were found.")
-
+                    if self.device == device:
+                        self.device = None
+                        print("⚠️ Active device disconnected.")
+            
+            # Start scanning for devices
+            print("🔍 Scanning for devices...")
+            await self.client.start_scanning()
+            await asyncio.sleep(5)  # Wait for devices to be discovered
+            await self.client.stop_scanning()
+            
+            # If we don't have a device yet, try to find one
+            if not self.device:
+                devices = self.client.devices
+                print(f"Found {len(devices)} device(s)")
+                
+                for dev in devices.values():
+                    if await self._try_use_device(dev):
+                        break
+                
+                if not self.device:
+                    print("⚠️ No compatible devices found. Please ensure your device is connected and paired.")
+        
+        except ProtocolError as e:
+            print(f"❌ Protocol error: {e}")
+            self._connected = False
         except Exception as e:
-            print(f"🔥 Error connecting to or scanning on Buttplug server: {e}")
+            print(f"🔥 Error in connection/scanning: {e}")
+            self._connected = False
+    
+    async def _try_use_device(self, device) -> bool:
+        """Try to use a device if it's compatible."""
+        try:
+            # Check if device has any actuators we can use
+            if any(hasattr(device, cmd) for cmd in ['linear', 'vibrate', 'rotate']):
+                with self._lock:
+                    self.device = device
+                    self.last_relative_speed = 0
+                    self.last_stroke_speed = 0
+                    self.last_depth_pos = 50
+                print(f"✅ Using device: {device.name}")
+                return True
+        except Exception as e:
+            print(f"⚠️ Error checking device {device.name}: {e}")
+        return False
+
+    @property
+    def is_connected(self) -> bool:
+        """Return the connection status.
+        
+        Returns:
+            bool: True if connected to server and has an active device, False otherwise
+        """
+        if not self._connected or self._shutting_down:
+            return False
+            
+        try:
+            # Check if we have a valid device reference
+            with self._lock:
+                has_device = self.device is not None
+                
+            # If we think we have a device but it's not in the client's device list anymore
+            if has_device and self.client and hasattr(self.client, 'devices') and self.device not in self.client.devices.values():
+                with self._lock:
+                    self.device = None
+                return False
+                
+            return has_device
+            
+        except Exception as e:
+            print(f"⚠️ Error checking connection status: {e}")
+            return False
 
     def connect(self):
-        """Public method to trigger the connection process from the main app thread."""
-        if self.client.is_connected:
+        """Starts the connection process in a non-blocking way."""
+        if self._shutting_down:
+            print("⚠️ Cannot connect while shutting down")
             return
-        # Safely submit the async connection task to the event loop thread
-        asyncio.run_coroutine_threadsafe(self._connect_and_scan(), self.loop)
-
-    def move(self, speed, depth, stroke_range):
-        """
-        Executes a SINGLE, COMPLETE move and waits for it to finish.
-        This is a BLOCKING call from the perspective of the main application.
-        """
-        with self._lock:
-            if not self.device:
-                print("⚠️ Move called but no device is connected.")
-                return
             
-            # Update state for the UI before executing the move
+        self._connected = False
+        try:
+            # Run the connection in a thread-safe way
+            future = asyncio.run_coroutine_threadsafe(
+                self._connect_and_scan(), 
+                self.loop
+            )
+            # Wait up to 10 seconds for connection
+            future.result(timeout=10)
+        except asyncio.TimeoutError:
+            print("⚠️ Connection attempt timed out")
+            self._connected = False
+        except Exception as e:
+            print(f"🔥 Error during connection: {e}")
+            self._connected = False
+
+    def move(self, speed: float, depth: float, stroke_range: float):
+        """
+        Executes a movement command with the given parameters.
+        
+        Args:
+            speed: Movement speed (0-100)
+            depth: Center position of the movement (0-100)
+            stroke_range: Range of the movement (0-100)
+        """
+        if not self.is_connected or not self.device:
+            print("⚠️ Cannot move: No device connected")
+            return
+            
+        # Update UI state
+        with self._lock:
             self.last_relative_speed = speed
+            self.last_stroke_speed = speed  # Keep in sync for compatibility
             self.last_depth_pos = depth
 
-        # A speed of 0 is a stop command
-        if speed is None or speed == 0:
+        # Stop command
+        if speed is None or speed <= 0:
             self.stop()
             return
+            
         if depth is None or stroke_range is None:
             return
 
-        # Define the async task to be run
         async def do_move():
-            # --- Linear Device Logic (Strokers) ---
-            if "Linear" in self.device.allowed_messages:
-                # Buttplug position is 0.0 (in) to 1.0 (out)
-                center_pos = depth / 100.0
-                half_range = (stroke_range / 100.0) / 2.0
-                pos1 = max(0.0, center_pos - half_range)
-                pos2 = min(1.0, center_pos + half_range)
-
-                # Duration is the time for ONE half-stroke.
-                # Higher speed means lower duration.
-                max_duration_ms = 2000
-                min_duration_ms = 200
-                duration_ms = int(max_duration_ms - (max_duration_ms - min_duration_ms) * (speed / 100.0))
-                
-                # Execute one full stroke (out and back)
-                await self.device.linear(duration_ms, pos1)
-                await asyncio.sleep(duration_ms / 1000.0)
-                await self.device.linear(duration_ms, pos2)
-                await asyncio.sleep(duration_ms / 1000.0)
-
-            # --- Vibrate Device Logic ---
-            elif "Vibrate" in self.device.allowed_messages:
-                vibration_level = speed / 100.0
-                # Vibrate commands don't have a duration, they just set a level.
-                # The "pause" will be handled by the sleep in background_modes.py
-                await self.device.vibrate(vibration_level)
+            try:
+                # Check device capabilities and execute appropriate command
+                if hasattr(self.device, 'linear'):
+                    # Convert UI values to device-specific values
+                    center_pos = max(0.0, min(1.0, depth / 100.0))
+                    half_range = max(0.0, min(0.5, (stroke_range / 100.0) / 2.0))
+                    
+                    # Calculate positions
+                    pos1 = max(0.0, center_pos - half_range)
+                    pos2 = min(1.0, center_pos + half_range)
+                    
+                    # Calculate duration based on speed (inverse relationship)
+                    min_duration = 200  # ms
+                    max_duration = 2000  # ms
+                    duration_ms = int(max_duration - (max_duration - min_duration) * (speed / 100.0))
+                    
+                    # Execute movement
+                    await self.device.linear(duration_ms, pos1)
+                    await asyncio.sleep(duration_ms / 1000.0)
+                    await self.device.linear(duration_ms, pos2)
+                    await asyncio.sleep(duration_ms / 1000.0)
+                    
+                elif hasattr(self.device, 'vibrate'):
+                    # Simple vibration based on speed
+                    level = min(1.0, max(0.0, speed / 100.0))
+                    await self.device.vibrate(level)
+                    
+                elif hasattr(self.device, 'rotate'):
+                    # For rotating devices, use speed for rotation speed
+                    speed_level = min(1.0, max(0.0, speed / 100.0))
+                    await self.device.rotate(speed_level, True)  # clockwise
+                    
+            except Exception as e:
+                print(f"⚠️ Error during move: {e}")
+                raise
         
         try:
-            # Submit the task to the event loop and WAIT for it to complete.
-            # The timeout prevents the main app from freezing if the device hangs.
+            # Execute the movement with a timeout
             future = asyncio.run_coroutine_threadsafe(do_move(), self.loop)
-            future.result(timeout=5.0) # Wait up to 5 seconds for the move to finish
+            future.result(timeout=5.0)  # 5 second timeout for the move
         except asyncio.TimeoutError:
-            print("🔥 Warning: Device move command timed out.")
+            print("⚠️ Move command timed out")
             self.stop()
         except Exception as e:
-            print(f"🔥 An error occurred during the move command: {e}")
+            print(f"🔥 Error executing move: {e}")
 
     def stop(self):
-        """Stops all device movement."""
-        with self._lock:
-            if not self.device:
-                return
+        """Stop all device movement."""
+        if not self.device:
+            return
+            
+        print("⏹️ Stopping device...")
         
-        print("...Sending stop command...")
         async def do_stop():
-            await self.device.stop()
+            try:
+                # Try to stop the device using available methods
+                if hasattr(self.device, 'stop'):
+                    await self.device.stop()
+                elif hasattr(self.device, 'vibrate'):
+                    await self.device.vibrate(0.0)
+                elif hasattr(self.device, 'linear'):
+                    # For linear devices, move to center position
+                    await self.device.linear(100, 0.5)
+                elif hasattr(self.device, 'rotate'):
+                    await self.device.rotate(0.0, True)
+            except Exception as e:
+                print(f"⚠️ Error during stop: {e}")
+                raise
         
         try:
             future = asyncio.run_coroutine_threadsafe(do_stop(), self.loop)
-            future.result(timeout=2.0)
-            print("✅ Device stop command sent.")
+            future.result(timeout=2.0)  # 2 second timeout for stop
+            print("✅ Device stopped")
+        except asyncio.TimeoutError:
+            print("⚠️ Stop command timed out")
         except Exception as e:
-            print(f"🔥 Error sending stop command: {e}")
+            print(f"🔥 Error stopping device: {e}")
+        finally:
+            # Update UI state
+            with self._lock:
+                self.last_relative_speed = 0
+                self.last_stroke_speed = 0
 
     def disconnect(self):
         """Gracefully disconnects from the server and cleans up resources."""
-        print("...Disconnecting from Buttplug server...")
-        if self.client.is_connected:
+        if self._shutting_down:
+            return
+            
+        print("🔌 Disconnecting from Buttplug server...")
+        self._shutting_down = True
+        
+        try:
+            # Stop any ongoing operations
+            self.stop()
+            
             # Create the async disconnect task
             async def do_disconnect():
-                await self.stop() # Ensure device is stopped first
-                await self.client.disconnect()
+                try:
+                    # Disconnect the client if connected
+                    if self._connected and hasattr(self.client, 'disconnect'):
+                        await self.client.disconnect()
+                        print("✅ Client disconnected from server.")
+                    
+                    # Clear device reference
+                    with self._lock:
+                        self.device = None
+                    
+                    # Stop the event loop
+                    if hasattr(self, 'loop') and self.loop.is_running():
+                        self.loop.stop()
+                        
+                except Exception as e:
+                    print(f"⚠️ Error during disconnect: {e}")
+                    raise
             
+            # Execute the disconnect with a timeout
             future = asyncio.run_coroutine_threadsafe(do_disconnect(), self.loop)
+            future.result(timeout=5.0)  # 5 second timeout for disconnect
+            
+        except asyncio.TimeoutError:
+            print("⚠️ Disconnect timed out, forcing cleanup...")
+        except Exception as e:
+            print(f"🔥 Error during disconnect: {e}")
+        finally:
+            # Ensure we clean up even if something went wrong
             try:
-                future.result(timeout=3.0)
-                print("✅ Client disconnected.")
+                # Stop the event loop if it's still running
+                if hasattr(self, 'loop') and self.loop.is_running():
+                    self.loop.call_soon_threadsafe(self.loop.stop)
+                
+                # Wait for the thread to finish (with a timeout)
+                if hasattr(self, 'thread') and self.thread.is_alive():
+                    self.thread.join(timeout=2.0)
+                    
+                # Final cleanup
+                self._connected = False
+                with self._lock:
+                    self.device = None
+                
+                print("✅ Cleanup complete.")
+                
             except Exception as e:
-                print(f"🔥 Error during disconnect: {e}")
-        
-        # Finally, stop the event loop thread
-        if self.loop.is_running():
-            self.loop.call_soon_threadsafe(self.loop.stop)
+                print(f"⚠️ Error during cleanup: {e}")
+            finally:
+                self._shutting_down = False

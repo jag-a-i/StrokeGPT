@@ -9,7 +9,7 @@ import threading
 import time
 from collections import deque
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template_string, send_file, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template, send_file, send_from_directory, send_file, session, redirect, url_for
 
 from settings_manager import SettingsManager
 from handy_controller import HandyController
@@ -21,6 +21,7 @@ from buttplug_controller import ButtplugController
 
 # ─── INITIALIZATION ───────────────────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-here'  # Required for session management
 LLM_URL = "http://127.0.0.1:11434/api/chat"
 settings = SettingsManager(settings_file_path="my_settings.json")
 settings.load()
@@ -154,7 +155,89 @@ def start_background_mode(mode_logic, initial_message, mode_name):
 # ─── FLASK ROUTES ──────────────────────────────────────────────────────────────────────────────────────
 @app.route('/')
 def home_page():
-    return send_from_directory('.', 'index.html')
+    # Check if setup is complete
+    if 'setup_complete' in session and session['setup_complete']:
+        return send_file('index.html')
+    return redirect(url_for('setup_page'))
+
+@app.route('/setup')
+def setup_page():
+    return render_template('setup.html')
+
+@app.route('/connect_buttplug', methods=['POST'])
+def connect_buttplug():
+    global device_controller
+    data = request.get_json()
+    host = data.get('host', 'ws://127.0.0.1')
+    port = data.get('port', '12345')
+    
+    try:
+        # Disconnect existing controller if any
+        if device_controller:
+            device_controller.disconnect()
+        
+        # Initialize and connect to Buttplug
+        device_controller = ButtplugController(server_uri=f"{host}:{port}")
+        device_controller.connect()
+        
+        # Store connection details in session
+        session['buttplug_connected'] = True
+        session['buttplug_host'] = host
+        session['buttplug_port'] = port
+        
+        return jsonify({
+            'success': True,
+            'message': 'Successfully connected to Buttplug server',
+            'device': str(device_controller.device) if device_controller.device else None
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/connect_llama', methods=['POST'])
+def connect_llama():
+    global llm
+    data = request.get_json()
+    host = data.get('host', 'http://localhost')
+    port = data.get('port', '11434')
+    api_key = data.get('api_key', '')
+    
+    try:
+        # Update LLM service URL
+        llm.url = f"{host.rstrip('/')}:{port}/api/chat"
+        
+        # Test the connection
+        test_response = llm.generate("Test connection", [])
+        
+        if test_response:
+            # Store connection details in session
+            session['llama_connected'] = True
+            session['llama_host'] = host
+            session['llama_port'] = port
+            session['llama_api_key'] = api_key
+            session['setup_complete'] = True  # Mark setup as complete
+            
+            return jsonify({
+                'success': True,
+                'message': 'Successfully connected to Llama server'
+            })
+        else:
+            raise Exception("Failed to get a valid response from Llama server")
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/setup/status')
+def setup_status():
+    return jsonify({
+        'buttplug_connected': session.get('buttplug_connected', False),
+        'llama_connected': session.get('llama_connected', False),
+        'setup_complete': session.get('setup_complete', False)
+    })
 
 # Serve static files from the 'static' directory
 @app.route('/static/<path:filename>')
