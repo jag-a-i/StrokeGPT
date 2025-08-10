@@ -23,5 +23,6 @@
   "milking_min_time": 2.5,
   "milking_max_time": 4.5,
   "edging_min_time": 5.0,
-  "edging_max_time": 8.0
+  "edging_max_time": 8.0,
+  "device_interface": ""
 }
