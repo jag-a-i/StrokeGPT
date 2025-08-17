@@ -33,7 +33,7 @@ class SetupFlow {
     /**
      * Initialize the setup flow
      */
-    init() {
+    async init() {
         // Load saved settings if any
         this.loadSettings();
         
@@ -42,8 +42,39 @@ class SetupFlow {
         document.getElementById('connect-llama-btn').addEventListener('click', this.connectLlama);
         document.getElementById('start-ai-btn').addEventListener('click', this.startAIOperations);
         
+        // Check the initial connection status with the server
+        await this.#checkInitialStatus();
+
         // Initialize the UI
         this.renderCurrentStep();
+    }
+
+    /**
+     * Check the initial connection status from the server
+     * and update the state accordingly.
+     */
+    async #checkInitialStatus() {
+        try {
+            const response = await fetch('/status');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const status = await response.json();
+
+            this.state.buttplug.connected = !!status.buttplug_connected;
+            this.state.llama.connected = !!status.llama_connected;
+
+            // Optionally, update currentStep if both are connected
+            if (this.state.buttplug.connected && this.state.llama.connected) {
+                this.state.currentStep = 3;
+            } else if (this.state.buttplug.connected) {
+                this.state.currentStep = 2;
+            } else {
+                this.state.currentStep = 1;
+            }
+
+            this.saveSettings();
+        } catch (error) {
+            console.error('Error checking initial status:', error);
+        }
     }
 
     /**
@@ -331,7 +362,7 @@ function initSetup() {
     showStep(currentStep);
     
     // Check initial connection status
-    checkConnectionStatus();
+    // checkConnectionStatus(); // Removed: now handled by SetupFlow class
 }
 
 // Set up event listeners
@@ -624,30 +655,6 @@ function updateLlamaStatus(connected) {
     }
 }
 
-// Check current connection status
-async function checkConnectionStatus() {
-    try {
-        const response = await fetch('/setup/status');
-        const status = await response.json();
-        
-        if (status.buttplug_connected) {
-            updateButtplugStatus(true);
-        }
-        
-        if (status.llama_connected) {
-            updateLlamaStatus(true);
-        }
-        
-        // If both are connected, mark setup as complete
-        if (status.buttplug_connected && status.llama_connected) {
-            currentStep = 3; // Go to the last step
-            updateProgress();
-            showStep(currentStep);
-        }
-    } catch (error) {
-        console.error('Error checking connection status:', error);
-    }
-}
 
 // Load saved settings from localStorage
 function loadSettings() {

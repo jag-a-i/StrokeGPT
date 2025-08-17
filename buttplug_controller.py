@@ -36,6 +36,11 @@ class ButtplugController:
         self._connected = False  # Track connection state
         self._shutting_down = False  # Flag for graceful shutdown
 
+        # Actuator references (Protocol v3)
+        self._vibrator_actuators = []
+        self._linear_actuators = []
+        self._rotatory_actuators = []
+
         # State variables for the UI
         self.last_relative_speed = 0  # 0-100 scale for UI
         self.last_depth_pos = 50      # 0-100 scale for UI
@@ -60,25 +65,10 @@ class ButtplugController:
         """The core async connection and scanning logic."""
         try:
             # Connect to the server
-            connector = ButtplugClientWebsocketConnector(self.server_uri)
+            connector = WebsocketConnector(self.server_uri)
             await self.client.connect(connector)
             self._connected = True
             print("✅ Successfully connected to Buttplug server.")
-            
-            # Set up device added/removed handlers
-            @self.client.device_added
-            async def on_device_added(device):
-                print(f"🔌 Device connected: {device.name}")
-                if not self.device:  # Use the first compatible device
-                    await self._try_use_device(device)
-            
-            @self.client.device_removed
-            async def on_device_removed(device):
-                print(f"🔌 Device disconnected: {device.name}")
-                with self._lock:
-                    if self.device == device:
-                        self.device = None
-                        print("⚠️ Active device disconnected.")
             
             # Start scanning for devices
             print("🔍 Scanning for devices...")
@@ -98,8 +88,8 @@ class ButtplugController:
                 if not self.device:
                     print("⚠️ No compatible devices found. Please ensure your device is connected and paired.")
         
-        except ProtocolError as e:
-            print(f"❌ Protocol error: {e}")
+        except ButtplugError as e:
+            print(f"❌ Buttplug error: {e}")
             self._connected = False
         except Exception as e:
             print(f"🔥 Error in connection/scanning: {e}")
@@ -108,14 +98,37 @@ class ButtplugController:
     async def _try_use_device(self, device) -> bool:
         """Try to use a device if it's compatible."""
         try:
-            # Check if device has any actuators we can use
-            if any(hasattr(device, cmd) for cmd in ['linear', 'vibrate', 'rotate']):
+            # Check if device has any actuators we can use (Protocol v3 approach)
+            # Store references to specific actuator types for later use
+            self._vibrator_actuators = []
+            self._linear_actuators = []
+            self._rotatory_actuators = []
+            
+            # Iterate through all actuators to identify their types
+            for actuator in device.actuators:
+                # For debugging, let's see what actuator types we have
+                print(f"  Actuator {actuator.index}: {actuator.description}")
+                
+                # Categorize actuators by their description
+                desc = actuator.description.lower()
+                if 'vibrate' in desc:
+                    self._vibrator_actuators.append(actuator)
+                elif 'linear' in desc:
+                    self._linear_actuators.append(actuator)
+                elif 'rotate' in desc:
+                    self._rotatory_actuators.append(actuator)
+            
+            # Check if we found any compatible actuators
+            if self._vibrator_actuators or self._linear_actuators or self._rotatory_actuators:
                 with self._lock:
                     self.device = device
                     self.last_relative_speed = 0
                     self.last_stroke_speed = 0
                     self.last_depth_pos = 50
                 print(f"✅ Using device: {device.name}")
+                print(f"  Found {len(self._vibrator_actuators)} vibrator actuators")
+                print(f"  Found {len(self._linear_actuators)} linear actuators")
+                print(f"  Found {len(self._rotatory_actuators)} rotatory actuators")
                 return True
         except Exception as e:
             print(f"⚠️ Error checking device {device.name}: {e}")
@@ -199,8 +212,8 @@ class ButtplugController:
 
         async def do_move():
             try:
-                # Check device capabilities and execute appropriate command
-                if hasattr(self.device, 'linear'):
+                # Use Protocol v3 actuator objects for device control
+                if self._linear_actuators:
                     # Convert UI values to device-specific values
                     center_pos = max(0.0, min(1.0, depth / 100.0))
                     half_range = max(0.0, min(0.5, (stroke_range / 100.0) / 2.0))
@@ -214,21 +227,29 @@ class ButtplugController:
                     max_duration = 2000  # ms
                     duration_ms = int(max_duration - (max_duration - min_duration) * (speed / 100.0))
                     
-                    # Execute movement
-                    await self.device.linear(duration_ms, pos1)
+                    # Execute movement on all linear actuators
+                    for actuator in self._linear_actuators:
+                        await actuator.command(duration_ms, pos1)
                     await asyncio.sleep(duration_ms / 1000.0)
-                    await self.device.linear(duration_ms, pos2)
+                    for actuator in self._linear_actuators:
+                        await actuator.command(duration_ms, pos2)
                     await asyncio.sleep(duration_ms / 1000.0)
                     
-                elif hasattr(self.device, 'vibrate'):
+                elif self._vibrator_actuators:
                     # Simple vibration based on speed
                     level = min(1.0, max(0.0, speed / 100.0))
-                    await self.device.vibrate(level)
                     
-                elif hasattr(self.device, 'rotate'):
+                    # Execute vibration on all vibrator actuators
+                    for actuator in self._vibrator_actuators:
+                        await actuator.command(level)
+                        
+                elif self._rotatory_actuators:
                     # For rotating devices, use speed for rotation speed
                     speed_level = min(1.0, max(0.0, speed / 100.0))
-                    await self.device.rotate(speed_level, True)  # clockwise
+                    
+                    # Execute rotation on all rotatory actuators
+                    for actuator in self._rotatory_actuators:
+                        await actuator.command(speed_level, True)  # clockwise
                     
             except Exception as e:
                 print(f"⚠️ Error during move: {e}")
@@ -253,16 +274,14 @@ class ButtplugController:
         
         async def do_stop():
             try:
-                # Try to stop the device using available methods
-                if hasattr(self.device, 'stop'):
-                    await self.device.stop()
-                elif hasattr(self.device, 'vibrate'):
-                    await self.device.vibrate(0.0)
-                elif hasattr(self.device, 'linear'):
-                    # For linear devices, move to center position
-                    await self.device.linear(100, 0.5)
-                elif hasattr(self.device, 'rotate'):
-                    await self.device.rotate(0.0, True)
+                # Use Protocol v3 actuator objects for stopping device
+                # Send stop commands to all actuators
+                for actuator in self._vibrator_actuators:
+                    await actuator.command(0.0)
+                for actuator in self._linear_actuators:
+                    await actuator.command(100, 0.5)  # Move to center position with short duration
+                for actuator in self._rotatory_actuators:
+                    await actuator.command(0.0, True)  # Stop rotation
             except Exception as e:
                 print(f"⚠️ Error during stop: {e}")
                 raise
@@ -301,9 +320,12 @@ class ButtplugController:
                         await self.client.disconnect()
                         print("✅ Client disconnected from server.")
                     
-                    # Clear device reference
+                    # Clear device reference and actuator lists
                     with self._lock:
                         self.device = None
+                        self._vibrator_actuators = []
+                        self._linear_actuators = []
+                        self._rotatory_actuators = []
                     
                     # Stop the event loop
                     if hasattr(self, 'loop') and self.loop.is_running():
@@ -336,6 +358,9 @@ class ButtplugController:
                 self._connected = False
                 with self._lock:
                     self.device = None
+                    self._vibrator_actuators = []
+                    self._linear_actuators = []
+                    self._rotatory_actuators = []
                 
                 print("✅ Cleanup complete.")
                 

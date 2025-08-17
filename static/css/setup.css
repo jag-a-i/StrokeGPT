@@ -92,6 +92,7 @@ body {
     position: absolute;
     top: 30px;
     left: 10%;
+    width: 0%;
     height: 3px;
     background: var(--cyan);
     z-index: 2;
