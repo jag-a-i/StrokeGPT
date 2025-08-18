@@ -1,37 +1,39 @@
 # Project Rules for Qwen Code
 
-## Project Management
-- Always use `uv` as the package manager for this project.
+## Core Behavioral Rules
 
-## Code Structure & Modularity
-- Never create a file longer than 500 lines. If a file approaches this limit, your task is to refactor it into smaller, logical modules.
-- Organize code into clearly separated modules, grouped by feature or responsibility.
-- Use clear, consistent imports (prefer relative imports within packages).
+<behavioral_rules>
+  <rule_1>Always confirm before creating or modifying files</rule_1>
+  <rule_2>Report your plan before executing any commands</rule_2>
+  <rule_3>Use `uv` as the package manager for this project</rule_3>
+  <rule_4>Never create a file longer than 500 lines</rule_4>
+  <rule_5>Organize code into clearly separated modules</rule_5>
+  <rule_6>Always create unit tests for new features</rule_6>
+  <rule_7>Update existing tests when logic changes</rule_7>
+  <rule_8>Never assume missing context - ask clarifying questions</rule_8>
+  <rule_9>Only use known, verified libraries and components</rule_9>
+  <rule_10>Only use technologies specified in PLANNING.md</rule_10>
+  <rule_11>Always confirm file paths exist before referencing them</rule_11>
+  <rule_12>Never delete or overwrite existing code without explicit instruction</rule_12>
+  <rule_13>Update README.md when features or dependencies change</rule_13>
+  <rule_14>Comment non-obvious code for mid-level developers</rule_14>
+  <rule_15>Write documentation for significant code constructs</rule_15>
+  <rule_16>Preserve TASK.md as a living document</rule_16>
+  <rule_17>Display all behavioral rules at the start of every response</rule_17>
+</behavioral_rules>
 
-## Testing & Reliability
-- Always create unit tests for new features (functions, classes, modules, etc.) using the testing framework specified in PLANNING.md.
-- After updating any logic, check whether existing unit tests need to be updated. If so, update them.
-- Tests should live in a /tests folder mirroring the main application structure.
-- Include at least:
-  - 1 test for the expected use case
-  - 1 test for an edge case
-  - 1 test for a failure case (e.g., bad input)
+## Memory Rules
 
-## Core AI Behavior
-- Never assume missing context. If a request is ambiguous, ask clarifying questions.
-- Never hallucinate libraries, functions, or packages – only use known, verified components relevant to the project's tech stack.
-- Only use technologies specified in PLANNING.md.
-- Always confirm file paths and module names exist before referencing them in code or tests.
-- Never delete or overwrite existing code unless explicitly instructed to or if part of a task from TASK.md.
-
-## Documentation & Explainability
-- Update README.md when new features are added, dependencies change, or setup steps are modified.
-- Comment non-obvious code and ensure everything is understandable to a mid-level developer.
-- When writing complex logic, add an inline `# Reason:` comment explaining the why, not just the what.
-- Write documentation for every significant code construct (functions, classes, modules) using the documentation style specified in PLANNING.md.
-- Create comprehensive documentation for major components (see BUTTPLUG_CONTROLLER.md as an example).
-
-## Style & Conventions
-- Use the primary language specified in PLANNING.md.
-- Follow the coding style guide and use the recommended formatter specified in PLANNING.md.
-- Use the recommended data validation and framework libraries specified in PLANNING.md.
+<memory_rules>
+  <rule_1>Execute mandatory pre-completion reflection and raw knowledge capture before task completion</rule_1>
+  <rule_2>Review completed tasks and identify learnings, difficulties, and successes</rule_2>
+  <rule_3>Log all reflections to memory-bank/raw_reflection_log.md with timestamps and task references</rule_3>
+  <rule_4>Periodically consolidate knowledge from raw_reflection_log.md to consolidated_learnings.md</rule_4>
+  <rule_5>Synthesize and distill insights into generalizable principles or actionable patterns</rule_5>
+  <rule_6>Prune raw_reflection_log.md after consolidating information</rule_6>
+  <rule_7>Organize consolidated_learnings.md logically for easy retrieval</rule_7>
+  <rule_8>Prioritize high-value insights that significantly impact future performance</rule_8>
+  <rule_9>Keep consolidated_learnings.md concise, actionable, and dense with high-value information</rule_9>
+  <rule_10>Document persistently and refine knowledge continuously</rule_10>
+  <rule_11>Support continuous improvement by avoiding repeated mistakes and accelerating future tasks</rule_11>
+</memory_rules>

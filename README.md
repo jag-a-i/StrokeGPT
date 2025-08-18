@@ -9,6 +9,7 @@ StrokeGPT is an application that provides AI-powered conversation with intimate 
 - Support for various intimate hardware devices (vibrators, strokers, etc.)
 - Web-based user interface
 - Real-time device control based on conversation context
+- Intuitive setup flow with step navigation and connection status feedback
 
 ## Technology Stack
 
@@ -68,6 +69,20 @@ The buttplug controller has been updated to fully comply with Protocol v3. Key f
 
 For detailed implementation information, see [BUTTPLUG_CONTROLLER.md](BUTTPLUG_CONTROLLER.md).
 
+## Setup Flow
+
+The application includes an intuitive setup flow with the following features:
+
+- **Step-by-step guidance** for connecting to both device and AI services
+- **Clickable step navigation** allowing users to move between steps as needed
+- **Real-time connection status** display for both Buttplug and Llama connections
+- **Reconnection capability** with "Reconnect" buttons when already connected
+- **Explicit disconnection** option for Buttplug devices
+- **Form persistence** maintaining user input when navigating between steps
+- **Visual feedback** through progress indicators and status messages
+
+The setup flow ensures users can easily configure their device and AI connections with clear feedback at each step.
+
 ## Configuration
 
 The application can be configured through:
@@ -88,7 +103,7 @@ pytest tests/
 - [buttplug-controller-fixes.md](buttplug-controller-fixes.md) - Buttplug controller improvements and fixes
 - [buttplug-py-error-cheatsheet.md](buttplug-py-error-cheatsheet.md) - Error handling reference
 - [PLANNING.md](PLANNING.md) - Project planning and technology stack
-- [TASK.md](TASK.md) - Current tasks and bug fixes
+- [TASK.md](TASK.md) - Current tasks and bug fixes (living document)
 - [QWEN.md](QWEN.md) - Project rules and guidelines
 
 ## Contributing

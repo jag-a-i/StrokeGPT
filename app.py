@@ -205,13 +205,19 @@ def connect_llama():
     api_key = data.get('api_key', '')
     
     try:
-        # Update LLM service URL
-        llm.url = f"{host.rstrip('/')}:{port}/api/chat"
+        # Update LLM service URL - fix URL construction
+        if host.endswith(':'):
+            # Host already includes port
+            llm.url = f"{host}11434/api/chat"
+        elif ':' in host.split('//')[-1]:
+            # Host includes port in the URL
+            llm.url = f"{host}/api/chat"
+        else:
+            # Host doesn't include port, add it
+            llm.url = f"{host}:{port}/api/chat"
         
         # Test the connection
-        test_response = llm.generate("Test connection", [])
-        
-        if test_response:
+        if llm.test_connection():
             # Store connection details in session
             session['llama_connected'] = True
             session['llama_host'] = host

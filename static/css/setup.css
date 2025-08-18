@@ -14,6 +14,7 @@
     --red: #ff5f5f;
     --yellow: #e0af68;
     --green: #9ece6a;
+    --orange: #ff9e64;
     --shadow: rgba(0, 0, 0, 0.3);
     --border-radius: 12px;
     --transition: all 0.2s ease;
@@ -106,6 +107,11 @@ body {
     z-index: 3;
     position: relative;
     width: 100px;
+    cursor: pointer; /* Make indicators clickable */
+}
+
+.step-indicator:hover {
+    opacity: 0.8;
 }
 
 .step-number {
@@ -244,6 +250,17 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.btn-secondary {
+    background: var(--comment);
+    color: var(--foreground);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #4a527a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .btn-block {
     display: block;
     width: 100%;
@@ -291,6 +308,44 @@ body {
 
 .setup-link:hover {
     text-decoration: underline;
+}
+
+/* Connection Status */
+.connection-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-left: 8px;
+    text-align: center;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.connection-status.connected {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.connection-status.disconnected {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.connection-status.text-info {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+}
+
+.connection-status.text-success {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.connection-status.text-danger {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
 }
 
 /* Animations */

@@ -6,6 +6,17 @@ class LLMService:
         self.url = url
         self.model = model
 
+    def test_connection(self):
+        """Test the connection to the LLM server."""
+        try:
+            # Simple test message
+            test_messages = [{"role": "user", "content": "Hello"}]
+            response = self._talk_to_llm(test_messages, temperature=0.7)
+            return response is not None
+        except Exception as e:
+            print(f"Error testing LLM connection: {e}")
+            return False
+
     def _talk_to_llm(self, messages, temperature=0.7):
         try:
             response = requests.post(self.url, json={

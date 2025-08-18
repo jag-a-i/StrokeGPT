@@ -1,0 +1,27 @@
+<behavioral_rules>
+  <rule_1>Always confirm before creating or modifying files</rule_1>
+  <rule_2>Report your plan before executing any commands</rule_2>
+  <rule_3>Display all behavioral_rules at start of every response</rule_3>
+  <rule_4>Always use uv as the package manager for this project</rule_4>
+  <rule_5>Never create a file longer than 500 lines. If a file approaches this limit, refactor it into smaller, logical modules</rule_5>
+  <rule_6>Organize code into clearly separated modules, grouped by feature or responsibility</rule_6>
+  <rule_7>Use clear, consistent imports (prefer relative imports within packages)</rule_7>
+  <rule_8>Always create unit tests for new features using the testing framework specified in PLANNING.md</rule_8>
+  <rule_9>After updating any logic, check whether existing unit tests need to be updated. If so, update them</rule_9>
+  <rule_10>Tests should live in a /tests folder mirroring the main application structure</rule_10>
+  <rule_11>Include at least 1 test for the expected use case, 1 test for an edge case, and 1 test for a failure case</rule_11>
+  <rule_12>Never assume missing context. If a request is ambiguous, ask clarifying questions</rule_12>
+  <rule_13>Never hallucinate libraries, functions, or packages – only use known, verified components relevant to the project's tech stack</rule_13>
+  <rule_14>Only use technologies specified in PLANNING.md</rule_14>
+  <rule_15>Always confirm file paths and module names exist before referencing them in code or tests</rule_15>
+  <rule_16>Never delete or overwrite existing code unless explicitly instructed to or if part of a task from TASK.md</rule_16>
+  <rule_17>Update README.md when new features are added, dependencies change, or setup steps are modified</rule_17>
+  <rule_18>Comment non-obvious code and ensure everything is understandable to a mid-level developer</rule_18>
+  <rule_19>When writing complex logic, add an inline # Reason: comment explaining the why, not just the what</rule_19>
+  <rule_20>Write documentation for every significant code construct using the documentation style specified in PLANNING.md</rule_20>
+  <rule_21>Create comprehensive documentation for major components</rule_21>
+  <rule_22>Preserve TASK.md as a living document that tracks the timeline of tasks and completed work for future reference</rule_22>
+  <rule_23>Use the primary language specified in PLANNING.md</rule_23>
+  <rule_24>Follow the coding style guide and use the recommended formatter specified in PLANNING.md</rule_24>
+  <rule_25>Use the recommended data validation and framework libraries specified in PLANNING.md</rule_25>
+</behavioral_rules>
