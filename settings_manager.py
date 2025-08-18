@@ -36,7 +36,7 @@ class SettingsManager:
 
     def load(self):
         if not self.file_path.exists():
-            print("ℹ️ No settings file found, creating one with default values.")
+            print("No settings file found, creating one with default values.")
             self.save()
             return
 
@@ -63,9 +63,9 @@ class SettingsManager:
             self.edging_min_time = data.get("edging_min_time", 5.0)
             self.edging_max_time = data.get("edging_max_time", 8.0)
             self.device_interface = data.get("device_interface", "")
-            print("✅ Loaded settings from my_settings.json")
+            print("Loaded settings from my_settings.json")
         except Exception as e:
-            print(f"⚠️ Couldn't read settings file, using defaults. Error: {e}")
+            print(f"Couldn't read settings file, using defaults. Error: {e}")
 
     def save(self, llm_service=None, chat_history_to_save=None):
         with self._save_lock:
@@ -75,7 +75,7 @@ class SettingsManager:
                 )
             
             if self.session_liked_patterns:
-                print(f"🧠 Saving {len(self.session_liked_patterns)} liked patterns...")
+                print(f"Saving {len(self.session_liked_patterns)} liked patterns...")
                 for new_pattern in self.session_liked_patterns:
                     if not any(p["name"] == new_pattern["name"] for p in self.patterns):
                         self.patterns.append(new_pattern)

@@ -48,6 +48,17 @@
        
         #top-bar { padding: 10px 20px; background-color: var(--background); border-bottom: 1px solid var(--background-lighter); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; position: relative; }
         #toggle-sidebar-btn { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: var(--background-lighter); border: none; color: var(--foreground); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transition: transform 0.3s ease-in-out, background-color 0.2s ease; font-size: 1.2em; display: flex; align-items: center; justify-content: center; }
+        
+        /* Connection status indicators */
+        .connection-status-indicators { display: flex; gap: 15px; align-items: center; }
+        .connection-status { display: flex; align-items: center; gap: 5px; font-size: 0.9em; }
+        .connection-status.connected { color: var(--cyan); }
+        .connection-status.disconnected { color: var(--red); }
+        .connection-status-icon { width: 8px; height: 8px; border-radius: 50%; }
+        .connection-status-icon.connected { background-color: var(--cyan); }
+        .connection-status-icon.disconnected { background-color: var(--red); }
+        .setup-btn { background: var(--background-lighter); border: none; color: var(--foreground); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: background-color 0.2s ease; }
+        .setup-btn:hover { background: var(--comment); }
         #toggle-sidebar-btn:hover { background-color: var(--comment); }
         body.sidebar-collapsed #toggle-sidebar-btn { transform: translateY(-50%) rotate(180deg); }
 
@@ -136,9 +147,20 @@
         <div id="top-bar">
             <h1>StrokeGPT</h1>
             <div class="top-bar-info">
+                <div class="connection-status-indicators">
+                    <div id="device-status" class="connection-status">
+                        <span class="connection-status-icon disconnected" id="device-status-icon"></span>
+                        <span id="device-status-text">Device: Disconnected</span>
+                    </div>
+                    <div id="ai-status" class="connection-status">
+                        <span class="connection-status-icon disconnected" id="ai-status-icon"></span>
+                        <span id="ai-status-text">AI: Disconnected</span>
+                    </div>
+                </div>
                 <div id="edging-timer" style="display: none;">00:00</div>
                 <div id="mood-display">Mood: ...</div>
             </div>
+            <button id="setup-btn" class="setup-btn">Settings</button>
             <button id="toggle-sidebar-btn">&laquo;</button>
         </div>
         <div id="chat-view">
@@ -570,20 +592,52 @@
         D.getElementById('start-auto-btn').addEventListener('click', () => sendUserMessage('take over'));
         D.getElementById('milking-mode-btn').addEventListener('click', () => apiCall('/start_milking_mode', {method:'POST'}));
 
-        // Polling Loops
+        // Connection status functions
+        function updateConnectionStatus() {
+            // This would be called periodically to update connection status
+            // For now, we'll implement a basic version
+            console.log("Updating connection status...");
+        }
+
+        // Setup button handler
+        function goToSetup() {
+            // Redirect to setup page
+            window.location.href = '/setup';
+        }
+
+        // Polling for connection status
         setInterval(async () => {
-            const data = await apiCall('/get_updates');
-            if (!data) return;
-            if (data instanceof Blob || (data.messages && data.messages.length > 0)) {
-                typingIndicator.style.display = 'none';
+            try {
+                const response = await fetch('/setup/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    
+                    // Update device status
+                    const deviceStatusIcon = document.getElementById('device-status-icon');
+                    const deviceStatusText = document.getElementById('device-status-text');
+                    if (status.buttplug_connected) {
+                        deviceStatusIcon.className = 'connection-status-icon connected';
+                        deviceStatusText.textContent = 'Device: Connected';
+                    } else {
+                        deviceStatusIcon.className = 'connection-status-icon disconnected';
+                        deviceStatusText.textContent = 'Device: Disconnected';
+                    }
+                    
+                    // Update AI status
+                    const aiStatusIcon = document.getElementById('ai-status-icon');
+                    const aiStatusText = document.getElementById('ai-status-text');
+                    if (status.llama_connected) {
+                        aiStatusIcon.className = 'connection-status-icon connected';
+                        aiStatusText.textContent = 'AI: Connected';
+                    } else {
+                        aiStatusIcon.className = 'connection-status-icon disconnected';
+                        aiStatusText.textContent = 'AI: Disconnected';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking connection status:', error);
             }
-            if (data instanceof Blob) {
-                const audio = new Audio(URL.createObjectURL(data));
-                audio.play();
-            } else if (data.messages) {
-                data.messages.forEach(msg => addChatMessage('BOT', msg));
-            }
-        }, 1500);
+        }, 2000); // Check every 2 seconds
 
         setInterval(async () => {
             const data = await apiCall('/get_status');
@@ -599,6 +653,12 @@
         D.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
             startupCheck();
+            
+            // Add event listener for setup button
+            const setupBtn = D.getElementById('setup-btn');
+            if (setupBtn) {
+                setupBtn.addEventListener('click', goToSetup);
+            }
         });
         
         // Helper function to add chat messages (for reference, unchanged)

@@ -1,29 +1,35 @@
 # Raw Reflection Log 
-  
-"---"  
-"Date: 2025-08-16"  
-"TaskRef: \"Setup flow improvements and buttplug controller fixes\""  
-""  
-"Learnings:"  
-"- Successfully implemented Protocol v3 compliance for buttplug controller by refactoring device capability detection, move, and stop methods"  
-"- Fixed setup flow UI issues including incorrect step initialization, connection status display, and reconnection capability"  
-"- Improved code organization by removing duplicate implementations and enhancing navigation"  
-"- Enhanced user experience with clickable step indicators, form persistence, and explicit disconnect functionality"  
-""  
-"Difficulties:"  
-"- Initial confusion with buttplug-py v3 API, particularly device event handling and actuator commands"  
-"- Setup flow had complex state management issues with step initialization and connection status"  
-"- Needed to understand the difference between legacy and modern JavaScript implementations in setup_flow.js"  
-""  
-"Successes:"  
-"- Successfully refactored buttplug controller to use actuator-based approach per Protocol v3"  
-"- Fixed all identified setup flow issues with improved navigation and connection management"  
-"- Created comprehensive documentation covering implementation details and improvements"  
-"- Enhanced project rules with behavioral and memory guidelines for future work"  
-""  
-"Improvements_Identified_For_Consolidation:"  
-"- General pattern: Protocol v3 migration requires refactoring from direct method calls to actuator-based commands"  
-"- UI/UX pattern: Always allow reconnection and provide explicit disconnect options"  
-"- Documentation pattern: Maintain living documents that track task completion and improvements"  
-"- Project management pattern: Preserve TASK.md as historical record of completed work"  
-"---" 
+
+---
+Date: 2025-08-18
+TaskRef: "Fixed ButtplugController issues and improved testing"
+
+Learnings:
+- Successfully identified and fixed the missing 'stop' method in ButtplugController
+- Resolved Unicode encoding issues on Windows by removing emoji characters from all Python files
+- Improved device detection logic by checking both device.actuators and specific actuator attributes (linear_actuators, rotatory_actuators)
+- Created comprehensive unit tests using pytest as specified in PLANNING.md
+- Updated documentation and comments to explain non-obvious code constructs
+- Ensured all test files are Windows-compatible by removing emoji characters
+- Used uv as the package manager to install pytest as specified in PLANNING.md
+
+Difficulties:
+- Dealing with async methods in unit tests required special handling
+- Some tests were initially failing due to improper mocking of async methods
+- Unicode encoding issues were causing runtime errors on Windows systems
+- Understanding the Buttplug protocol v3 device detection mechanism required careful examination
+
+Successes:
+- Successfully fixed the AttributeError when calling stop() on ButtplugController
+- All unit tests now pass with the pytest framework
+- Device detection now works properly for devices like Kiiroo Keon that expose actuators through specific attributes
+- Improved code documentation and comments for better maintainability
+- Maintained backward compatibility while adding new functionality
+
+Improvements_Identified_For_Consolidation:
+- Testing pattern: Always use pytest for unit tests and ensure async methods are properly mocked
+- Cross-platform compatibility pattern: Avoid emoji characters in console output for Windows compatibility
+- Device detection pattern: Check both generic actuators list and specific actuator attributes for maximum compatibility
+- Documentation pattern: Add detailed docstrings and comments for complex logic
+- Error handling pattern: Gracefully handle missing methods and edge cases
+---

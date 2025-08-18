@@ -130,6 +130,14 @@ The controller ensures proper cleanup of resources:
 - Stops the asyncio event loop
 - Joins background threads
 
+## Testing
+
+Several test scripts are available for verifying functionality:
+
+1. **test_device_movement.py** - Tests basic device movement patterns
+2. **test_actuators.py** - Tests individual actuator functionality
+3. **interactive_test.py** - Provides interactive control for manual testing
+
 ## Usage Example
 
 ```python

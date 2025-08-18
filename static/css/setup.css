@@ -81,8 +81,8 @@ body {
     content: '';
     position: absolute;
     top: 30px;
-    left: 10%;
-    right: 10%;
+    left: 5%;
+    right: 5%;
     height: 3px;
     background: var(--background-lighter);
     z-index: 1;
@@ -92,7 +92,7 @@ body {
 .progress-bar {
     position: absolute;
     top: 30px;
-    left: 10%;
+    left: 5%;
     width: 0%;
     height: 3px;
     background: var(--cyan);
@@ -261,6 +261,11 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+}
+
 .btn-block {
     display: block;
     width: 100%;
@@ -346,6 +351,53 @@ body {
 .connection-status.text-danger {
     background-color: rgba(239, 68, 68, 0.2);
     color: #ef4444;
+}
+
+.connection-status.text-warning {
+    background-color: rgba(224, 175, 104, 0.2);
+    color: #e0af68;
+}
+
+/* Device List */
+.device-list {
+    margin-top: 1rem;
+}
+
+.device-item {
+    background: var(--background-lighter);
+    border: 1px solid var(--comment);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: var(--transition);
+}
+
+.device-item:hover {
+    border-color: var(--cyan);
+}
+
+.device-item.selected {
+    border-color: var(--green);
+    background: rgba(158, 206, 106, 0.1);
+}
+
+.device-name {
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.device-details {
+    font-size: 0.8rem;
+    color: var(--comment);
+    margin-bottom: 0.5rem;
+}
+
+.no-devices {
+    text-align: center;
+    color: var(--comment);
+    font-style: italic;
+    padding: 2rem;
 }
 
 /* Animations */

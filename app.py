@@ -185,10 +185,36 @@ def connect_buttplug():
         session['buttplug_host'] = host
         session['buttplug_port'] = port
         
+        # Get device information
+        device_info = None
+        device_list = []
+        if device_controller and device_controller.client:
+            devices = device_controller.client.devices
+            device_list = []
+            for dev in devices.values():
+                device_list.append({
+                    'index': dev.index,
+                    'name': dev.name,
+                    'actuators': len(dev.actuators),
+                    'linear_actuators': len(dev.linear_actuators),
+                    'rotatory_actuators': len(dev.rotatory_actuators)
+                })
+            
+            # If we have a device, get its info
+            if device_controller.device:
+                device_info = {
+                    'index': device_controller.device.index,
+                    'name': device_controller.device.name,
+                    'actuators': len(device_controller.device.actuators)
+                }
+        
         return jsonify({
             'success': True,
             'message': 'Successfully connected to Buttplug server',
-            'device': str(device_controller.device) if device_controller.device else None
+            'server_connected': True,
+            'device_connected': device_controller.is_connected if device_controller else False,
+            'device': device_info,
+            'devices': device_list
         })
     except Exception as e:
         return jsonify({
@@ -206,14 +232,16 @@ def connect_llama():
     
     try:
         # Update LLM service URL - fix URL construction
-        if host.endswith(':'):
+        # Ensure host has protocol
+        if not host.startswith('http'):
+            host = f"http://{host}"
+        
+        # Construct URL properly
+        if ':' in host.split('//')[-1]:
             # Host already includes port
-            llm.url = f"{host}11434/api/chat"
-        elif ':' in host.split('//')[-1]:
-            # Host includes port in the URL
             llm.url = f"{host}/api/chat"
         else:
-            # Host doesn't include port, add it
+            # Add port to host
             llm.url = f"{host}:{port}/api/chat"
         
         # Test the connection
@@ -237,8 +265,21 @@ def connect_llama():
             'error': str(e)
         }), 500
 
+@app.route('/setup_complete', methods=['POST'])
+def setup_complete():
+    """Mark setup as complete and store connection status in session."""
+    data = request.get_json()
+    
+    # Store connection status in session
+    session['buttplug_connected'] = data.get('buttplug_connected', False)
+    session['llama_connected'] = data.get('llama_connected', False)
+    session['setup_complete'] = data.get('setup_complete', True)
+    
+    return jsonify({'status': 'success', 'message': 'Setup marked as complete'})
+
 @app.route('/setup/status')
 def setup_status():
+    """Get the current setup status."""
     return jsonify({
         'buttplug_connected': session.get('buttplug_connected', False),
         'llama_connected': session.get('llama_connected', False),
@@ -547,7 +588,7 @@ def stop_auto_route():
 
 # ─── APP STARTUP & SHUTDOWN ─────────────────────────────────────────────────────────────────────────────
 def on_exit():
-    print("⏳ Saving settings and disconnecting device on exit...")
+    print("Saving settings and disconnecting device on exit...")
     settings.save(llm, chat_history)
 
     # INTEGRATION: Gracefully disconnect the device controller if it supports it.
@@ -559,6 +600,6 @@ def on_exit():
 if __name__ == '__main__':
     atexit.register(on_exit)
     # The app now starts without a device selected. The user must choose one from the UI.
-    print(f"🚀 Starting StrokeGPT server at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
+    print(f"Starting StrokeGPT server at {time.strftime('%Y-%m-%d %H:%M:%S')}...")
     print("   Please open your browser to http://127.0.0.1:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)

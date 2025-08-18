@@ -97,6 +97,13 @@ Run tests using pytest:
 pytest tests/
 ```
 
+The project now includes comprehensive unit tests for the ButtplugController using pytest. Tests cover:
+- Controller initialization
+- Connection handling
+- Device detection and actuator categorization
+- Movement and stop functionality
+- Error handling
+
 ## Documentation
 
 - [BUTTPLUG_CONTROLLER.md](BUTTPLUG_CONTROLLER.md) - Detailed buttplug controller implementation

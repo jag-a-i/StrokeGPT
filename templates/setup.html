@@ -22,27 +22,32 @@
             
             <div class="step-indicator active" id="step-1-indicator">
                 <div class="step-number">1</div>
-                <div class="step-label">Device Setup</div>
+                <div class="step-label">Server Setup</div>
             </div>
             
             <div class="step-indicator" id="step-2-indicator">
                 <div class="step-number">2</div>
-                <div class="step-label">AI Setup</div>
+                <div class="step-label">Device Setup</div>
             </div>
             
             <div class="step-indicator" id="step-3-indicator">
                 <div class="step-number">3</div>
+                <div class="step-label">AI Setup</div>
+            </div>
+            
+            <div class="step-indicator" id="step-4-indicator">
+                <div class="step-number">4</div>
                 <div class="step-label">Ready</div>
             </div>
         </div>
 
         <div class="setup-content">
-            <!-- Step 1: Buttplug Setup -->
+            <!-- Step 1: Buttplug Server Setup -->
             <div class="setup-step active" id="setup-step-1">
-                <h2 class="step-title">Connect Your Device</h2>
+                <h2 class="step-title">Connect to Intiface Central</h2>
                 <p class="step-description">
-                    First, let's connect to your device via Intiface Central.
-                    Make sure Intiface Central is running and your device is connected before continuing.
+                    First, let's connect to Intiface Central server.
+                    Make sure Intiface Central is running before continuing.
                 </p>
                 
                 <div class="form-group">
@@ -56,15 +61,19 @@
                 </div>
                 
                 <div class="form-group">
-                    <div id="buttplug-status" class="connection-status disconnected">Not Connected</div>
+                    <div id="buttplug-status" class="connection-status disconnected">Server Not Connected</div>
                 </div>
                 
                 <button id="connect-buttplug-btn" class="btn btn-primary btn-block">
                     <i class="bi bi-plug me-2"></i>Connect to Intiface Central
                 </button>
                 
+                <button id="next-server-btn" class="btn btn-secondary btn-block" style="display: none; margin-top: 10px;">
+                    <i class="bi bi-arrow-right me-2"></i>Next: Select Device
+                </button>
+                
                 <button id="disconnect-buttplug-btn" class="btn btn-secondary btn-block" style="display: none; margin-top: 10px;">
-                    <i class="bi bi-x-circle me-2"></i>Disconnect
+                    <i class="bi bi-x-circle me-2"></i>Disconnect Server
                 </button>
                 
                 <p class="hint">
@@ -73,8 +82,38 @@
                 </p>
             </div>
 
-            <!-- Step 2: Llama Setup -->
+            <!-- Step 2: Device Selection -->
             <div class="setup-step" id="setup-step-2">
+                <h2 class="step-title">Select Your Device</h2>
+                <p class="step-description">
+                    Select a device from the list below. Make sure your device is connected and paired with Intiface Central.
+                </p>
+                
+                <div class="form-group">
+                    <div id="device-status" class="connection-status disconnected">No Device Connection</div>
+                </div>
+                
+                <div class="form-group">
+                    <button id="refresh-devices-btn" class="btn btn-secondary btn-block">
+                        <i class="bi bi-arrow-repeat me-2"></i>Refresh Devices
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <button id="next-device-btn" class="btn btn-secondary btn-block" style="display: none; margin-top: 10px;">
+                        <i class="bi bi-arrow-right me-2"></i>Next: Configure AI
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <div id="device-list">
+                        <!-- Device list will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Llama Setup -->
+            <div class="setup-step" id="setup-step-3">
                 <h2 class="step-title">Configure AI Settings</h2>
                 <p class="step-description">
                     Now, let's connect to your Llama server.
@@ -103,10 +142,14 @@
                 <button id="connect-llama-btn" class="btn btn-primary btn-block" disabled>
                     <i class="bi bi-cpu me-2"></i>Connect to Llama Server
                 </button>
+                
+                <button id="next-llama-btn" class="btn btn-secondary btn-block" style="display: none; margin-top: 10px;">
+                    <i class="bi bi-arrow-right me-2"></i>Next: Ready to Start
+                </button>
             </div>
 
-            <!-- Step 3: Ready -->
-            <div class="setup-step" id="setup-step-3">
+            <!-- Step 4: Ready -->
+            <div class="setup-step" id="setup-step-4">
                 <div class="success-message">
                     <svg class="success-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" fill="#9ece6a"/>
@@ -119,7 +162,7 @@
                 
                 <div class="button-container">
                     <button id="start-ai-btn" class="btn btn-primary">
-                        Start StrokeGPT
+                        <i class="bi bi-play-circle me-2"></i>Start StrokeGPT
                     </button>
                 </div>
             </div>

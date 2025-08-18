@@ -1,5 +1,6 @@
 import json
 import requests
+from urllib.parse import urljoin
 
 class LLMService:
     def __init__(self, url, model="llama3:8b-instruct-q4_K_M"):
@@ -19,7 +20,12 @@ class LLMService:
 
     def _talk_to_llm(self, messages, temperature=0.7):
         try:
-            response = requests.post(self.url, json={
+            # Ensure URL is properly formatted
+            url = self.url
+            if not url.startswith('http'):
+                url = f"http://{url}"
+            
+            response = requests.post(url, json={
                 "model": self.model,
                 "stream": False,
                 "format": "json",

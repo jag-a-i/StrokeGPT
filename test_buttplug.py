@@ -3,54 +3,61 @@ Test script for ButtplugController.
 Run this script to test the connection to Intiface Central and device control.
 """
 import time
+import sys
+import os
 from buttplug_controller import ButtplugController
 
+# Fix for Windows encoding issue
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+
 def test_connection():
-    print("🔌 Initializing ButtplugController...")
+    print("Initializing ButtplugController...")
     controller = ButtplugController()
     
     try:
         # Test connection
-        print("\n🔄 Connecting to Intiface Central...")
+        print("\nConnecting to Intiface Central...")
         controller.connect()
         
         # Wait for connection and device discovery
-        print("\n🔍 Scanning for devices (this may take a few seconds)...")
+        print("\nScanning for devices (this may take a few seconds)...")
         time.sleep(5)  # Give some time for device discovery
         
         if not controller.is_connected:
-            print("\n❌ Failed to connect to Intiface Central or no devices found.")
+            print("\nFailed to connect to Intiface Central or no devices found.")
             print("Please ensure Intiface Central is running and a device is connected.")
             return
             
-        print("\n✅ Successfully connected and found a device!")
+        print("\nSuccessfully connected and found a device!")
         
         # Test basic movement
-        print("\n🔄 Testing basic movement...")
+        print("\nTesting basic movement...")
         print("Moving to position 50% with speed 50%...")
         controller.move(speed=50, depth=50, stroke_range=50)
         time.sleep(3)
         
-        print("\n⏹ Stopping device...")
+        print("\nStopping device...")
         controller.stop()
         
         # Test vibration (if device supports it)
-        if hasattr(controller.device, 'vibrate'):
-            print("\n📳 Testing vibration...")
+        # Note: In the new Protocol v3 implementation, we check for actuators instead
+        if controller._vibrator_actuators:
+            print("\nTesting vibration...")
             controller.move(speed=30, depth=0, stroke_range=0)  # Just vibration, no movement
             time.sleep(2)
             controller.stop()
         
-        print("\n✅ All tests completed successfully!")
+        print("\nAll tests completed successfully!")
         
     except KeyboardInterrupt:
-        print("\n🛑 Test interrupted by user")
+        print("\nTest interrupted by user")
     except Exception as e:
-        print(f"\n❌ An error occurred: {e}")
+        print(f"\nAn error occurred: {e}")
     finally:
-        print("\n🔌 Cleaning up...")
+        print("\nCleaning up...")
         controller.disconnect()
-        print("✅ Done!")
+        print("Done!")
 
 if __name__ == "__main__":
     print("=" * 60)
