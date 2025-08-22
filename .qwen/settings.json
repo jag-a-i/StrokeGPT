@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+      "shrimp-task-manager": {
+        "command": "node",
+        "args": ["C:\\Users\\blibd\\OneDrive\\Documensts\\Cline\\MCP\\mcp-shrimp-task-manager\\dist\\index.js"],
+        "env": {
+          "DATA_DIR": "C:\\Users\\blibd\\OneDrive\\Documensts\\Cline\\MCP\\mcp-shrimp-task-manager\\data",
+          "TEMPLATES_USE": "en",
+          "ENABLE_GUI": "false"
+        }
+      }
+    }
+  }

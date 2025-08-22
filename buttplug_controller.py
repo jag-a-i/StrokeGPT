@@ -46,6 +46,12 @@ class ButtplugController:
         self.last_depth_pos = 50      # 0-100 scale for UI
         self.last_stroke_speed = 0    # Alias for last_relative_speed for compatibility
         
+        # Continuous movement state
+        self._target_speed = 0
+        self._target_depth = 50
+        self._target_range = 50
+        self._movement_active = False
+        
         # Setup async event loop in a background thread
         self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(
@@ -54,12 +60,80 @@ class ButtplugController:
             name="ButtplugControllerThread"
         )
         self.thread.start()
+        
+        # Start the continuous movement loop
+        self._start_movement_loop()
+        
         print("Buttplug Controller initialized. Waiting for connection...")
 
     def _run_event_loop(self):
         """Runs the asyncio event loop in its own thread."""
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
+
+    def _start_movement_loop(self):
+        """Start the continuous movement loop."""
+        async def movement_loop():
+            """Continuous movement loop that runs in the background."""
+            pos1 = 0.25  # Default positions
+            pos2 = 0.75
+            current_pos = pos1
+            
+            while not self._shutting_down:
+                try:
+                    # Check if we should be moving
+                    if self._movement_active and self.is_connected and self.device:
+                        # Update positions based on current targets
+                        center_pos = max(0.0, min(1.0, self._target_depth / 100.0))
+                        half_range = max(0.0, min(0.5, (self._target_range / 100.0) / 2.0))
+                        pos1 = max(0.0, center_pos - half_range)
+                        pos2 = min(1.0, center_pos + half_range)
+                        
+                        # Calculate duration based on speed (inverse relationship)
+                        min_duration = 200  # ms
+                        max_duration = 2000  # ms
+                        duration_ms = int(max_duration - (max_duration - min_duration) * (self._target_speed / 100.0))
+                        
+                        # Determine next position
+                        if current_pos == pos1:
+                            next_pos = pos2
+                        else:
+                            next_pos = pos1
+                            
+                        current_pos = next_pos
+                        
+                        # Execute movement on all linear actuators
+                        if self._linear_actuators:
+                            for actuator in self._linear_actuators:
+                                await actuator.command(duration_ms, current_pos)
+                            await asyncio.sleep(duration_ms / 1000.0)
+                            
+                        # For vibrator actuators, just maintain continuous vibration
+                        elif self._vibrator_actuators:
+                            level = min(1.0, max(0.0, self._target_speed / 100.0))
+                            for actuator in self._vibrator_actuators:
+                                await actuator.command(level)
+                            await asyncio.sleep(0.1)  # Small delay for continuous vibration
+                            
+                        # For rotatory actuators, just maintain continuous rotation
+                        elif self._rotatory_actuators:
+                            speed_level = min(1.0, max(0.0, self._target_speed / 100.0))
+                            for actuator in self._rotatory_actuators:
+                                await actuator.command(speed_level, True)  # clockwise
+                            await asyncio.sleep(0.1)  # Small delay for continuous rotation
+                        else:
+                            # No compatible actuators, small delay to prevent busy loop
+                            await asyncio.sleep(0.1)
+                    else:
+                        # Not moving, small delay to prevent busy loop
+                        await asyncio.sleep(0.1)
+                        
+                except Exception as e:
+                    print(f"Error in movement loop: {e}")
+                    await asyncio.sleep(1)  # Longer delay on error
+        
+        # Start the movement loop
+        asyncio.run_coroutine_threadsafe(movement_loop(), self.loop)
 
     async def _connect_and_scan(self):
         """The core async connection and scanning logic."""
@@ -89,10 +163,14 @@ class ButtplugController:
                     print("No compatible devices found. Please ensure your device is connected and paired.")
         
         except ButtplugError as e:
-            print(f"Buttplug error: {e}")
+            # Handle Buttplug-specific errors
+            error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+            print(f"Buttplug error: {error_msg}")
             self._connected = False
         except Exception as e:
-            print(f"Error in connection/scanning: {e}")
+            # Handle all other exceptions
+            error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+            print(f"Error in connection/scanning: {error_msg}")
             self._connected = False
     
     async def _try_use_device(self, device) -> bool:
@@ -221,31 +299,25 @@ class ButtplugController:
             print("Connection attempt timed out")
             self._connected = False
         except Exception as e:
-            print(f"Error during connection: {e}")
+            error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+            print(f"Error during connection: {error_msg}")
             self._connected = False
 
     def move(self, speed: float, depth: float, stroke_range: float):
         """
-        Executes a movement command with the given parameters.
+        Set continuous movement parameters.
         
-        This method controls device actuators based on their type:
-        - Linear actuators: Perform reciprocating movements with specified speed, depth, and range
-        - Vibrator actuators: Provide vibration at intensity based on speed
-        - Rotatory actuators: Provide rotation at speed based on the speed parameter
+        This method updates the target parameters for continuous movement.
+        The actual movement is handled by a background loop that continuously
+        moves the device according to these parameters.
         
         Args:
-            speed: Movement speed (0-100). For linear actuators, this determines the
-                   duration of each movement cycle (inverse relationship). For vibrator
-                   and rotatory actuators, this determines intensity/speed.
-            depth: Center position of the movement (0-100). Only used for linear actuators.
-            stroke_range: Range of the movement (0-100). Only used for linear actuators.
-            
-        Note:
-            If speed is None or <= 0, the method calls stop() to halt all movements.
-            If depth or stroke_range is None, the method returns without action.
+            speed: Movement speed (0-100)
+            depth: Center position of the movement (0-100)
+            stroke_range: Range of the movement (0-100)
         """
         if not self.is_connected or not self.device:
-            print("⚠️ Cannot move: No device connected")
+            print("Cannot move: No device connected")
             return
             
         # Update UI state
@@ -254,88 +326,18 @@ class ButtplugController:
             self.last_stroke_speed = speed  # Keep in sync for compatibility
             self.last_depth_pos = depth
 
-        # Stop command
-        if speed is None or speed <= 0:
-            self.stop()
-            return
-            
-        if depth is None or stroke_range is None:
-            return
-
-        async def do_move():
-            try:
-                print(f"Executing move: speed={speed}, depth={depth}, stroke_range={stroke_range}")
-                # Use Protocol v3 actuator objects for device control
-                if self._linear_actuators:
-                    print(f"Moving {len(self._linear_actuators)} linear actuators")
-                    # Convert UI values to device-specific values
-                    center_pos = max(0.0, min(1.0, depth / 100.0))
-                    half_range = max(0.0, min(0.5, (stroke_range / 100.0) / 2.0))
-                    
-                    # Calculate positions
-                    pos1 = max(0.0, center_pos - half_range)
-                    pos2 = min(1.0, center_pos + half_range)
-                    
-                    # Calculate duration based on speed (inverse relationship)
-                    min_duration = 200  # ms
-                    max_duration = 2000  # ms
-                    duration_ms = int(max_duration - (max_duration - min_duration) * (speed / 100.0))
-                    
-                    print(f"  Duration: {duration_ms}ms, Position1: {pos1}, Position2: {pos2}")
-                    
-                    # Execute movement on all linear actuators
-                    for actuator in self._linear_actuators:
-                        print(f"  Sending command to linear actuator {actuator.index}: {duration_ms}ms, {pos1}")
-                        await actuator.command(duration_ms, pos1)
-                    await asyncio.sleep(duration_ms / 1000.0)
-                    for actuator in self._linear_actuators:
-                        print(f"  Sending command to linear actuator {actuator.index}: {duration_ms}ms, {pos2}")
-                        await actuator.command(duration_ms, pos2)
-                    await asyncio.sleep(duration_ms / 1000.0)
-                    print(f"Linear movement completed")
-                    
-                elif self._vibrator_actuators:
-                    print(f"Vibrating {len(self._vibrator_actuators)} vibrator actuators")
-                    # Simple vibration based on speed
-                    level = min(1.0, max(0.0, speed / 100.0))
-                    
-                    # Execute vibration on all vibrator actuators
-                    for actuator in self._vibrator_actuators:
-                        print(f"  Sending command to vibrator actuator {actuator.index}: {level}")
-                        await actuator.command(level)
-                    print(f"Vibration completed")
-                        
-                elif self._rotatory_actuators:
-                    print(f"Rotating {len(self._rotatory_actuators)} rotatory actuators")
-                    # For rotating devices, use speed for rotation speed
-                    speed_level = min(1.0, max(0.0, speed / 100.0))
-                    
-                    # Execute rotation on all rotatory actuators
-                    for actuator in self._rotatory_actuators:
-                        print(f"  Sending command to rotatory actuator {actuator.index}: {speed_level}")
-                        await actuator.command(speed_level, True)  # clockwise
-                    print(f"Rotation completed")
-                else:
-                    print("No compatible actuators found for movement")
-            except Exception as e:
-                print(f"Error during move: {e}")
-                import traceback
-                traceback.print_exc()
-                raise
-                    
-            except Exception as e:
-                print(f"Error during move: {e}")
-                raise
+        # Update target parameters for continuous movement
+        self._target_speed = speed
+        self._target_depth = depth
+        self._target_range = stroke_range
         
-        try:
-            # Execute the movement with a timeout
-            future = asyncio.run_coroutine_threadsafe(do_move(), self.loop)
-            future.result(timeout=5.0)  # 5 second timeout for the move
-        except asyncio.TimeoutError:
-            print("Move command timed out")
+        # Activate movement if not already active
+        if speed > 0:
+            self._movement_active = True
+        else:
+            self._movement_active = False
+            # Stop the device
             self.stop()
-        except Exception as e:
-            print(f"Error executing move: {e}")
 
     def test_movement(self):
         """Test device movement with a simple pattern."""
@@ -380,17 +382,16 @@ class ButtplugController:
     def stop(self):
         """Stop all device movements.
         
-        This method sends stop commands to all connected actuators:
-        - For vibrator actuators: Sets intensity to 0.0
-        - For linear actuators: Moves to center position (0.5) with a short duration
-        - For rotatory actuators: Stops rotation by setting speed to 0.0
-        
-        The method is safe to call even when no device is connected.
+        This method stops continuous movement by setting the movement active flag to False
+        and sending stop commands to all actuators.
         """
         if not self.is_connected or not self.device:
             print("Cannot stop: No device connected")
             return
             
+        # Deactivate continuous movement
+        self._movement_active = False
+        
         async def do_stop():
             try:
                 print("Stopping all device movements...")
@@ -417,7 +418,8 @@ class ButtplugController:
                     
                 print("All device movements stopped")
             except Exception as e:
-                print(f"Error during stop: {e}")
+                error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+                print(f"Error during stop: {error_msg}")
                 raise
         
         try:
@@ -427,7 +429,8 @@ class ButtplugController:
         except asyncio.TimeoutError:
             print("Stop command timed out")
         except Exception as e:
-            print(f"Error executing stop: {e}")
+            error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+            print(f"Error executing stop: {error_msg}")
 
     def disconnect(self):
         """Gracefully disconnects from the server and cleans up resources."""
@@ -461,7 +464,8 @@ class ButtplugController:
                         self.loop.stop()
                         
                 except Exception as e:
-                    print(f"Error during disconnect: {e}")
+                    error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+                    print(f"Error during disconnect: {error_msg}")
                     raise
             
             # Execute the disconnect with a timeout
@@ -471,7 +475,8 @@ class ButtplugController:
         except asyncio.TimeoutError:
             print("Disconnect timed out, forcing cleanup...")
         except Exception as e:
-            print(f"Error during disconnect: {e}")
+            error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+            print(f"Error during disconnect: {error_msg}")
         finally:
             # Ensure we clean up even if something went wrong
             try:
@@ -494,6 +499,7 @@ class ButtplugController:
                 print("Cleanup complete.")
                 
             except Exception as e:
-                print(f"Error during cleanup: {e}")
+                error_msg = str(e) if hasattr(e, '__str__') else repr(e)
+                print(f"Error during cleanup: {error_msg}")
             finally:
                 self._shutting_down = False

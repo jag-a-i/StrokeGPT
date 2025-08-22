@@ -25,7 +25,7 @@
   "milking_patterns": [],
   "rules": [],
   "user_profile": {
-    "chat": "LLM Connection Error: No connection adapters were found for 'localhost:11434/api/chat'",
+    "chat": "LLM Connection Error: Expecting value: line 1 column 1 (char 0)",
     "move": null,
     "new_mood": null
   },

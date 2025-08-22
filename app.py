@@ -168,17 +168,27 @@ def setup_page():
 def connect_buttplug():
     global device_controller
     data = request.get_json()
-    host = data.get('host', 'ws://127.0.0.1')
+    host = data.get('host', '127.0.0.1')
     port = data.get('port', '12345')
     
     try:
         # Disconnect existing controller if any
         if device_controller:
-            device_controller.disconnect()
+            try:
+                device_controller.disconnect()
+                # Give some time for proper cleanup
+                import time
+                time.sleep(0.5)
+            except Exception as e:
+                print(f"Error disconnecting previous controller: {e}")
         
         # Initialize and connect to Buttplug
-        device_controller = ButtplugController(server_uri=f"{host}:{port}")
+        device_controller = ButtplugController(server_uri=f"ws://{host}:{port}")
         device_controller.connect()
+        
+        # Give some time for connection to establish
+        import time
+        time.sleep(2)
         
         # Store connection details in session
         session['buttplug_connected'] = True
@@ -403,14 +413,27 @@ def handle_user_message():
     
     llm_response = llm.get_chat_response(chat_history, get_current_context())
     
+    # Handle empty or invalid LLM responses
+    if not llm_response or not isinstance(llm_response, dict):
+        error_message = "I'm having trouble responding right now. Please try again."
+        add_message_to_queue(error_message)
+        return jsonify({"status": "llm_error", "message": error_message})
+    
     if special_persona_mode is not None:
         special_persona_interactions_left -= 1
         if special_persona_interactions_left <= 0:
             special_persona_mode = None
             add_message_to_queue("(Personality core reverted to standard operation.)", add_to_history=False)
 
-    if chat_text := llm_response.get("chat"): add_message_to_queue(chat_text)
-    if new_mood := llm_response.get("new_mood"): global current_mood; current_mood = new_mood
+    if chat_text := llm_response.get("chat"): 
+        add_message_to_queue(chat_text)
+    else:
+        # If no chat text, provide a default response
+        add_message_to_queue("I'm processing your request...")
+        
+    if new_mood := llm_response.get("new_mood"): 
+        global current_mood
+        current_mood = new_mood
     
     # INTEGRATION: Use the generic controller for movement.
     if not auto_mode_active_task and (move := llm_response.get("move")):

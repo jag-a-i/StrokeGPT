@@ -33,20 +33,27 @@ class LLMService:
                 "messages": messages
             }, timeout=60)
             
-            content = response.json()["message"]["content"]
+            # Check if response is valid
+            if not response.ok:
+                raise requests.exceptions.RequestException(f"HTTP {response.status_code}: {response.text}")
+            
+            # Try to parse JSON response
+            response_json = response.json()
+            content = response_json["message"]["content"]
+            
+            # Check if content is empty
+            if not content or not content.strip():
+                raise ValueError("Empty response content")
+                
             return json.loads(content)
         
-        except (json.JSONDecodeError, KeyError, requests.exceptions.RequestException) as e:
+        except (json.JSONDecodeError, KeyError, requests.exceptions.RequestException, ValueError) as e:
             print(f"Error processing LLM response: {e}")
-            try:
-                content_str = response.json()["message"]["content"]
-                start = content_str.find('{')
-                end = content_str.rfind('}') + 1
-                if start != -1 and end != -1:
-                    return json.loads(content_str[start:end])
-            except Exception:
-                 return {"chat": f"LLM Connection Error: {e}", "move": None, "new_mood": None}
-            return {"chat": f"LLM Connection Error: {e}", "move": None, "new_mood": None}
+            # Return a default response to keep the conversation going
+            return {"chat": "I'm processing your request...", "move": None, "new_mood": None}
+        except Exception as e:
+            print(f"Unexpected error processing LLM response: {e}")
+            return {"chat": "I'm having trouble responding right now.", "move": None, "new_mood": None}
 
     def _build_system_prompt(self, context):
         if context.get('special_persona_mode') == 'GLaDOS':
