@@ -11,7 +11,10 @@
         "ENABLE_GUI": "false"
       },
       "alwaysAllow": [
-        "plan_task"
+        "plan_task",
+        "split_tasks",
+        "list_tasks",
+        "execute_task"
       ]
     }
   }
